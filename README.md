@@ -1,6 +1,6 @@
 ## Tyre-Sync
 
-###### An AI-Powered Predictive Tyre Health Monitoring System and Predictive Failure Detection System
+###### An ML-Based Predictive Tyre Health Monitoring System and Predictive Failure Detection System
 
 ---
 
