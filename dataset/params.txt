@@ -1,0 +1,258 @@
+================================================================================
+  SmartTyre AI — Parameter Reference Guide
+  Tyre Health Monitoring & Predictive Failure Detection System
+================================================================================
+
+The MLP model uses 29 input features (21 sensor/derived + 6 tyre-position 
+one-hot + 2 axle-type one-hot) to predict a Tyre Health Score (0–100).
+
+Parameters are grouped into three categories:
+  1. Direct Sensor Parameters  — raw readings from onboard sensors
+  2. Derived Parameters        — computed from direct sensor data
+  3. Environment / Context     — vehicle-level and ambient conditions
+
+
+════════════════════════════════════════════════════════════════════════════════
+ 1. DIRECT SENSOR PARAMETERS
+════════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────┬───────────┬────────────────────────────────────────────┐
+│ Parameter           │ Sensor    │ Description                                │
+├─────────────────────┼───────────┼────────────────────────────────────────────┤
+│ pressure_kpa        │ BMP180    │ Tyre inflation pressure in kiloPascals.    │
+│                     │           │ Normal range: ~620–760 kPa for commercial  │
+│                     │           │ tyres. Under-inflation (<600) increases    │
+│                     │           │ rolling resistance, heat buildup, and      │
+│                     │           │ sidewall flex. Over-inflation (>800)       │
+│                     │           │ reduces contact patch and causes uneven    │
+│                     │           │ centre wear. This is the single most       │
+│                     │           │ impactful parameter for tyre health.       │
+├─────────────────────┼───────────┼────────────────────────────────────────────┤
+│ temperature_c       │ DS18B20 / │ Internal tyre temperature in °C. Normal    │
+│                     │ NTC       │ operating range: 40–80°C. Temperatures     │
+│                     │           │ above ~90°C indicate dangerous heat        │
+│                     │           │ buildup from friction, under-inflation,    │
+│                     │           │ or overloading. Beyond 120°C, rubber       │
+│                     │           │ compounds begin to degrade rapidly.        │
+│                     │           │ Sustained high temps shorten tyre life     │
+│                     │           │ exponentially.                             │
+├─────────────────────┼───────────┼────────────────────────────────────────────┤
+│ load_kg             │ HX711     │ Vertical load on the tyre in kilograms,   │
+│                     │ (load     │ measured via a load cell on the axle/      │
+│                     │  cell)    │ suspension. Commercial tyre ratings are    │
+│                     │           │ typically 1500–2500 kg per tyre.           │
+│                     │           │ Overloading causes excessive sidewall      │
+│                     │           │ flex, heat generation, and accelerated     │
+│                     │           │ tread wear. Chronic overloading is a       │
+│                     │           │ leading cause of blowouts in trucks.       │
+├─────────────────────┼───────────┼────────────────────────────────────────────┤
+│ deformation_mm      │ HC-SR04   │ Sidewall deflection/bulge measured in mm  │
+│                     │ (ultra-   │ via ultrasonic distance sensor mounted     │
+│                     │  sonic)   │ inside the wheel well. Normal: 5–12 mm.   │
+│                     │           │ Values >20 mm may indicate a sidewall     │
+│                     │           │ bulge, internal structural damage, or      │
+│                     │           │ severe under-inflation. Sudden spikes      │
+│                     │           │ are precursors to blowouts.               │
+├─────────────────────┼───────────┼────────────────────────────────────────────┤
+│ tread_depth_mm      │ HC-SR04   │ Remaining tread depth in mm, measured by  │
+│                     │ (ultra-   │ a second ultrasonic sensor aimed at the    │
+│                     │  sonic)   │ tread surface. New tyres: ~10–12 mm.      │
+│                     │           │ Legal minimum: 1.6 mm. Safety threshold:  │
+│                     │           │ 3 mm (wet-weather grip degrades sharply    │
+│                     │           │ below this). This parameter directly       │
+│                     │           │ determines remaining tyre life.            │
+├─────────────────────┼───────────┼────────────────────────────────────────────┤
+│ accel_x_g           │ MPU6050   │ Lateral acceleration in g-force units.    │
+│                     │ (IMU)     │ Captures side-to-side forces on the tyre  │
+│                     │           │ during cornering. Large values indicate    │
+│                     │           │ aggressive driving or alignment issues.    │
+├─────────────────────┼───────────┼────────────────────────────────────────────┤
+│ accel_y_g           │ MPU6050   │ Longitudinal acceleration in g. Captures  │
+│                     │ (IMU)     │ braking and acceleration forces. Spikes   │
+│                     │           │ indicate hard braking or sudden            │
+│                     │           │ acceleration, both of which increase       │
+│                     │           │ tread wear.                                │
+├─────────────────────┼───────────┼────────────────────────────────────────────┤
+│ accel_z_g           │ MPU6050   │ Vertical acceleration in g. Normally ~1.0 │
+│                     │ (IMU)     │ (gravity). Deviations from 1.0 indicate   │
+│                     │           │ impacts (potholes, speed bumps) or tyre   │
+│                     │           │ bounce. Repeated high-g impacts cause      │
+│                     │           │ internal belt damage.                      │
+├─────────────────────┼───────────┼────────────────────────────────────────────┤
+│ vibration_rms_g     │ MPU6050   │ Root Mean Square of accelerometer         │
+│                     │ (derived  │ readings, representing overall vibration   │
+│                     │  from     │ intensity in g. Normal: <0.1 g. Values    │
+│                     │  accel)   │ >0.3 g suggest wheel imbalance, flat      │
+│                     │           │ spots, separated belts, or bearing         │
+│                     │           │ failure. High vibration accelerates        │
+│                     │           │ wear on all suspension components.         │
+└─────────────────────┴───────────┴────────────────────────────────────────────┘
+
+
+════════════════════════════════════════════════════════════════════════════════
+ 2. DERIVED PARAMETERS
+════════════════════════════════════════════════════════════════════════════════
+
+These are computed from direct sensor readings and provide higher-level 
+diagnostic signals that improve the model's predictive accuracy.
+
+┌──────────────────────────────┬───────────────────────────────────────────────┐
+│ Parameter                    │ Description                                   │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ rotational_speed_rpm         │ Tyre rotation speed in RPM, derived from     │
+│                              │ gyro_z_dps (gyroscope Z-axis). Used to       │
+│                              │ detect locked wheels, free-spinning (loss    │
+│                              │ of traction), or mismatched rotation         │
+│                              │ between dual tyres.                          │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ vehicle_speed_kmph           │ Estimated vehicle speed from tyre rotation   │
+│                              │ and known tyre circumference. Cross-         │
+│                              │ referenced with GPS/OBD if available.        │
+│                              │ Higher speeds increase heat generation       │
+│                              │ and wear rate non-linearly.                  │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ pressure_deviation_pct       │ Percentage deviation of current pressure     │
+│                              │ from the recommended inflation pressure.     │
+│                              │ Formula: ((actual - recommended) /           │
+│                              │ recommended) × 100. Negative = under-        │
+│                              │ inflated, positive = over-inflated.          │
+│                              │ Deviations beyond ±10% are flagged.          │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ temp_rise_rate_c_per_min     │ Rate of temperature increase in °C per       │
+│                              │ minute. Computed from a rolling window of    │
+│                              │ temperature readings. Normal: <1°C/min.      │
+│                              │ A rapid rise (>3°C/min) signals friction     │
+│                              │ issues, brake drag, or imminent failure      │
+│                              │ even if absolute temp is still moderate.     │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ load_ratio_pct               │ Current load as a percentage of the tyre's   │
+│                              │ rated maximum load capacity. Formula:        │
+│                              │ (load_kg / rated_max) × 100. Values >100%   │
+│                              │ mean the tyre is overloaded. Even 85–100%    │
+│                              │ sustained loading accelerates wear.          │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ load_pressure_ratio          │ Ratio of load (kg) to pressure (kPa).       │
+│                              │ Captures the interaction between these two   │
+│                              │ critical parameters. High values mean the    │
+│                              │ tyre is carrying heavy load relative to      │
+│                              │ its inflation — the most dangerous           │
+│                              │ combination for blowout risk.                │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ tread_wear_pct               │ Percentage of tread already consumed.        │
+│                              │ Formula: ((new_depth - current_depth) /      │
+│                              │ (new_depth - min_depth)) × 100.             │
+│                              │ 0% = brand new tyre, 100% = worn to the     │
+│                              │ legal limit. The model uses this to          │
+│                              │ estimate remaining useful life.              │
+└──────────────────────────────┴───────────────────────────────────────────────┘
+
+
+════════════════════════════════════════════════════════════════════════════════
+ 3. ENVIRONMENT / CONTEXT PARAMETERS
+════════════════════════════════════════════════════════════════════════════════
+
+┌──────────────────────────────┬───────────────────────────────────────────────┐
+│ Parameter                    │ Description                                   │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ odometer_km                  │ Total distance travelled by the vehicle in   │
+│                              │ km. Provides context for tyre age — a tyre   │
+│                              │ at 200,000 km is expected to show more       │
+│                              │ wear than one at 50,000 km. Also helps      │
+│                              │ the model learn degradation curves.          │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ ambient_temp_c               │ External/ambient temperature in °C. Hot      │
+│                              │ climates (>40°C) compound tyre heating.      │
+│                              │ Cold temps (<5°C) increase rubber            │
+│                              │ stiffness and reduce grip. The model         │
+│                              │ uses this to contextualize tyre temp         │
+│                              │ readings (70°C in 45°C ambient is less       │
+│                              │ alarming than 70°C in 10°C ambient).         │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ gyro_x_dps                   │ Roll rate in degrees/second from the         │
+│                              │ MPU6050 gyroscope. Captures body roll        │
+│                              │ during cornering, which shifts load          │
+│                              │ between inner and outer tyres.               │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ gyro_y_dps                   │ Pitch rate in degrees/second. Captures       │
+│                              │ forward/backward weight transfer during      │
+│                              │ braking and acceleration.                    │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ gyro_z_dps                   │ Yaw/rotation rate in degrees/second. For     │
+│                              │ a wheel-mounted IMU, this primarily          │
+│                              │ captures the tyre's rotational speed.        │
+│                              │ Used to derive rotational_speed_rpm.         │
+└──────────────────────────────┴───────────────────────────────────────────────┘
+
+
+════════════════════════════════════════════════════════════════════════════════
+ 4. CATEGORICAL / ONE-HOT ENCODED PARAMETERS (handled internally)
+════════════════════════════════════════════════════════════════════════════════
+
+These are not user-adjustable sliders — they are set automatically based on
+which tyre position is selected in the UI.
+
+┌──────────────────────────────┬───────────────────────────────────────────────┐
+│ Parameter                    │ Description                                   │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ tyre_id_FL                   │ Front-Left tyre. Steer axle. Experiences     │
+│                              │ high lateral forces during turns.             │
+├──────────────────────────────┤                                               │
+│ tyre_id_FR                   │ Front-Right tyre. Steer axle.                │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ tyre_id_RLI                  │ Rear-Left Inner (dual tyre). Drive axle.     │
+│                              │ Inner duals run hotter due to reduced        │
+│                              │ airflow and proximity to the other tyre.     │
+├──────────────────────────────┤                                               │
+│ tyre_id_RLO                  │ Rear-Left Outer (dual tyre). Drive axle.     │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ tyre_id_RRI                  │ Rear-Right Inner (dual tyre). Drive axle.    │
+├──────────────────────────────┤                                               │
+│ tyre_id_RRO                  │ Rear-Right Outer (dual tyre). Drive axle.    │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ axle_type_drive              │ 1 if the tyre is on the drive axle (rear).   │
+│                              │ Drive tyres experience torque and tend to    │
+│                              │ wear faster in the centre of the tread.      │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ axle_type_steer              │ 1 if the tyre is on the steer axle (front). │
+│                              │ Steer tyres experience more lateral wear     │
+│                              │ on the shoulders due to turning forces.      │
+└──────────────────────────────┴───────────────────────────────────────────────┘
+
+
+════════════════════════════════════════════════════════════════════════════════
+ 5. MODEL OUTPUT
+════════════════════════════════════════════════════════════════════════════════
+
+┌──────────────────────────────┬───────────────────────────────────────────────┐
+│ Output                       │ Description                                   │
+├──────────────────────────────┼───────────────────────────────────────────────┤
+│ tyre_health_score (0–100)    │ Composite health index predicted by the MLP. │
+│                              │                                               │
+│                              │   90–100  Excellent — no action needed        │
+│                              │   75–89   Good — routine monitoring           │
+│                              │   50–74   Watch — schedule inspection         │
+│                              │   30–49   Warning — maintenance needed soon   │
+│                              │    0–29   Critical — immediate attention      │
+│                              │                                               │
+│                              │ The score is mapped to a risk class:          │
+│                              │   ≥75  →  Healthy  (green)                    │
+│                              │   ≥50  →  Watch    (amber)                    │
+│                              │   ≥30  →  Warning  (orange)                   │
+│                              │   <30  →  Critical (red)                      │
+└──────────────────────────────┴───────────────────────────────────────────────┘
+
+
+════════════════════════════════════════════════════════════════════════════════
+ 6. SENSOR HARDWARE MAPPING (Wokwi-compatible substitutes)
+════════════════════════════════════════════════════════════════════════════════
+
+  Sensor       │ Measures               │ Parameters Fed
+  ─────────────┼────────────────────────┼──────────────────────────────────
+  BMP180       │ Barometric pressure    │ pressure_kpa
+  DS18B20/NTC  │ Temperature            │ temperature_c
+  HX711        │ Load (via load cell)   │ load_kg
+  HC-SR04 ×2   │ Ultrasonic distance    │ deformation_mm, tread_depth_mm
+  MPU6050      │ 6-axis IMU             │ accel_x/y/z_g, gyro_x/y/z_dps,
+               │ (accel + gyro)         │ vibration_rms_g, rotational_speed_rpm
+
+================================================================================

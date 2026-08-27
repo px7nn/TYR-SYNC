@@ -1,0 +1,15 @@
+24,000 rows, 29 columns, covering all six positions (FL, FR, RLO, RLI, RRO, RRI), built to match your Wokwi sensor substitutes exactly:
+
+Direct sensor columns (per your table): pressure_kpa (BMP180), temperature_c (DS18B20/NTC), load_kg (HX711), deformation_mm + tread_depth_mm (HC-SR04 ×2), accel_x/y/z_g + gyro_x/y/z_dps (MPU6050).
+
+Derived columns: vibration_rms_g, rotational_speed_rpm, vehicle_speed_kmph, pressure_deviation_pct, temp_rise_rate_c_per_min, load_ratio_pct, load_pressure_ratio, tread_wear_pct — plus context (ambient_temp_c, odometer_km, axle_type).
+
+Targets: tyre_health_score (0–100, regression), risk_class (Healthy/Watch/Warning/Critical), dominant_fault (which parameter is driving the risk — useful for the "actionable recommendation" part of your problem statement).
+
+How it was built: rather than pulling numbers from thin air, I searched for real thresholds (TPMS pressure norms, the 195–200°F/70°C temperature danger zone, the 1.6mm/3mm tread limits, dual-tyre load ratings, etc.) and used those to drive a fault-injection simulator — 9 scenarios (normal, under/over-inflation, overheating, overload, tread wear, vibration/imbalance, sidewall bulge, multi-fault) with physically coupled effects (e.g. underinflation also raises temperature and deformation, like real tyres). references.txt maps every constant to its source, and clearly flags the handful of values (vibration thresholds, deformation-bulge numbers, tread wear-out mileage) that had no public standard and were engineering judgement calls — worth saying openly to SIH judges rather than presenting as fact.
+
+A couple of things worth knowing before you train:
+
+Drop injected_scenario and dominant_fault from your MLP input features if you're predicting tyre_health_score — they're leakage/audit columns, not sensor readings.
+vehicle_id/trip_id let you group-split train/test (don't let the same vehicle leak across splits).
+generate_dataset.py is included too, so you can retune thresholds, change class balance, or regenerate with more rows straight from the script.

@@ -1,0 +1,177 @@
+AI-POWERED SMART TYRE HEALTH MONITORING — DATA SOURCES & ASSUMPTIONS
+======================================================================
+This file lists where every numeric threshold, nominal value and failure
+boundary in generate_dataset.py / tyre_health_dataset.csv came from. Rows
+marked [ENGINEERING ASSUMPTION] have no single public standard behind them
+(no public multi-sensor commercial-tyre dataset exists) — they were set
+using reasonable engineering judgement so they can be defended and re-tuned
+in front of SIH judges. Everything else is grounded in the cited source.
+
+------------------------------------------------------------------------
+1. TYRE PRESSURE (BMP180 substitute for Infineon SP49/SP490 TPMS)
+------------------------------------------------------------------------
+- Commercial truck steer-axle cold inflation pressure ~100–110 psi (~690–760
+  kPa); drive/trailer dual tyres commonly run 75–105 psi cold, with many
+  fleets standardising ~95–100 psi for safety margin.
+    Source: Heavy Duty Trucking, "The Magic Number"
+    https://www.truckinginfo.com/153054/the-magic-number
+    Source: NeoTires, "Tire Pressure for Cars, SUVs, and Trailers"
+    https://neotires.com/what-tire-psi-should-my-tires-be
+    Source: TruckersReport forum (steer tyre 100–110 psi cold practice)
+    https://www.thetruckersreport.com/truckingindustryforum/threads/tire-pressure.1950726/
+    Source: autoreviewnest.com, "Truck Tire PSI Guide 2026"
+    https://autoreviewnest.com/what-psi-for-truck-tires-pressure-load-safety-tips/
+
+- Under-inflation more than 0.6 bar (8 psi) below the recommended value must
+  be corrected immediately; >10 bar (145 psi) not recommended for normal
+  highway operation. Used to set the "must-correct-now" pressure deviation
+  boundary.
+    Source: Michelin, "What is the correct pressure for truck and bus tyres?"
+    https://b2b.middle-east.michelin.com/help-advice/truck-bus-tyre-the-right-pressure
+
+- Standard TPMS alarm threshold is ±25% deviation from the recommended
+  placard pressure. Used directly as PRESSURE_TPMS_ALARM_FRAC = 0.25.
+    Source: Pirelli, "TPMS Light On: What it means and what you need to do"
+    https://www.pirelli.com/tires/en-us/car/driving-and-tire-tips/how-to-read/tpms-light-on
+
+- Tyre pressure changes ~1–2 psi per 10°F (used qualitatively to justify
+  coupling temperature and pressure noise, not as a hard-coded constant).
+    Source: autoreviewnest.com (citing U.S. Tire Manufacturers Association)
+    https://autoreviewnest.com/what-psi-for-truck-tires-pressure-load-safety-tips/
+
+------------------------------------------------------------------------
+2. TYRE TEMPERATURE (DS18B20/NTC substitute for PT100 + MAX31865)
+------------------------------------------------------------------------
+- Tyres become dangerous at 195–200°F (~90.5–93.3°C); recommended early TPMS
+  warning threshold is 158°F (~70°C). Used directly as TEMP_WARNING_C = 70
+  and TEMP_CRITICAL_C = 92.
+    Source: Performance Plus Tire, "What is a Dangerous Temperature for Tires?"
+    https://www.performanceplustire.com/Blog/what-is-a-dangerous-temperature-for-tires-critical-safety-limits-explained
+
+- Field TPMS practice commonly sets alarms around 70°C on all axles for
+  loaded highway operation (corroborates the 70°C warning boundary).
+    Source: 4x4community.co.za forum thread, "TPMS - Temperature Setting"
+    https://www.4x4community.co.za/forum/showthread.php/325368-TPMS-Temperature-Setting
+
+- Patented tyre-monitoring logic flags a temperature-difference/hot-spot of
+  >10°C between locations as abnormal, and a second threshold band of
+  80–100°C as the boundary for a more severe alarm. Used to justify a
+  distinct high-severity band above the basic critical threshold.
+    Source: US Patent (image-ppubs.uspto.gov), "Tire monitoring techniques"
+    https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/7467034
+
+- Blowout-risk detection logic: a temperature rise of ≥6°C within a short
+  (~120 s) window is used as an independent "rate of change" trigger,
+  separate from the absolute temperature threshold. Used directly as
+  TEMP_RISE_RATE_CRITICAL = 6.0 (per our per-sample "per minute" derived
+  feature, scaled to the same order of magnitude).
+    Source: Patent, "Method for detecting a tyre blowout risk"
+    https://image-ppubs.uspto.gov/dirsearch-public/print/downloadPdf/11298992
+
+- Under-inflated tyres run hotter due to increased flex/friction (used to
+  justify coupling an "under_heat_bonus" onto temperature during the
+  underinflation fault scenario).
+    Source: Michelin b2b guidance (see section 1) + Michelin Connected Fleet
+    https://connectedfleet.michelin.com/solution/tyre-pressure-and-temperature-monitoring/
+
+------------------------------------------------------------------------
+3. LOAD (HX711 + load cell substitute for a high-temperature automotive
+   load cell)
+------------------------------------------------------------------------
+- At the standard 34,000 lb tandem axle weight limit, each dual tyre carries
+  ~4,250 lb (~1,930 kg); load/inflation tables show ~75–80 psi minimum for a
+  rated load of 4,550 lb (~2,064 kg) per tyre. Used to set
+  MAX_LOAD_KG(drive) = 2000 kg and to couple load with the nominal drive
+  pressure of ~690 kPa (100 psi).
+    Source: Heavy Duty Trucking, "The Magic Number"
+    https://www.truckinginfo.com/153054/the-magic-number
+- Steer-axle max load (3,400 kg) and the 90%/100% "watch/overload" load
+  boundary are [ENGINEERING ASSUMPTION] — no single public per-tyre load
+  standard was found; typical steer tyre load ratings run higher than a
+  single dual tyre, consistent with the higher steer cold pressure above.
+
+------------------------------------------------------------------------
+4. DEFORMATION / TREAD DEPTH (HC-SR04 substitutes for ToF/optical +
+   ToF/laser sensors)
+------------------------------------------------------------------------
+- Legal minimum tread depth is 1.6 mm (2/32") across the central 3/4 of the
+  tread, worldwide/UK/US standard. Used directly as LEGAL_MIN_TREAD_MM = 1.6.
+    Source: The AA, "Check your tyres for proper tread depth"
+    https://www.theaa.com/driving-advice/legal/tyres
+    Source: Michelin, "Tyre tread depth and legal limit"
+    https://www.michelin.co.uk/auto/advice/tyre-basics/tyre-tread-depth
+    Source: Tire Rack, "How Much Tread Depth Is Enough?"
+    https://www.tirerack.com/upgrade-garage/how-much-tread-depth-is-enough
+    Source: Geotab, "Minimum Tire Tread Depth: 2026 Safety & Legal Guide"
+    https://www.geotab.com/blog/minimum-tire-tread-depth/
+
+- Safety organisations (RoSPA, Brake, Fleet News/Kwik Fit fleet policy) and
+  Tire Rack wet-braking tests recommend replacing at 3 mm, not waiting for
+  the legal 1.6 mm limit. Used directly as SAFE_MIN_TREAD_MM = 3.0.
+    Source: Fleet News, "Free tyre checks" / fleet FAQ
+    https://www.fleetnews.co.uk/news/2005/11/1/free-tyre-checks/20617/
+    https://fleetnews.co.uk/fleet-faq/what-is-the-legal-tyre-tread-depth-limit-/26
+    Source: Tire Rack (4/32" ≈ 3.2 mm wet-safety buffer recommendation)
+    https://www.tirerack.com/upgrade-garage/how-much-tread-depth-is-enough
+
+- New commercial truck tyre tread depth (~18 mm) and average service-life
+  wear-out mileage (~150,000–220,000 km) are [ENGINEERING ASSUMPTION],
+  based on general industry knowledge that commercial tyres are far deeper
+  than passenger tyres and typically last on the order of 150–300k km
+  depending on axle position and retreading — no single authoritative public
+  number was located during this research pass.
+
+- Sidewall/tread deformation (bulge) numeric thresholds (normal ~5–15 mm
+  flex, structural-risk >25 mm) are [ENGINEERING ASSUMPTION] — an
+  ultrasonic-sensor deflection proxy for load- and pressure-induced
+  sidewall flex; no public standard for this specific measurement method
+  was found. This is flagged as an area to validate experimentally with
+  the real HC-SR04 rig once built.
+
+------------------------------------------------------------------------
+5. VIBRATION / ROTATIONAL BEHAVIOUR (MPU6050 substitute for automotive
+   high-G IMU + 3-axis gyro)
+------------------------------------------------------------------------
+- Vibration RMS thresholds (normal <0.30 g, warning 0.30–0.60 g, critical
+  >0.60 g) are [ENGINEERING ASSUMPTION]. They follow the general pattern
+  used in industrial/automotive wheel-imbalance and defect-detection
+  literature of flagging vibration as a multiple of a smooth-road baseline
+  RMS, rather than a single universal number (which does not exist publicly
+  for tyre-mounted accelerometers). Intended to be recalibrated against the
+  real MPU6050 rig's smooth-road baseline once hardware data is available.
+- rotational_speed_rpm is derived kinematically (rpm = vehicle speed ÷ wheel
+  circumference), not looked up — this is a physics relation, not a cited
+  external fact.
+
+------------------------------------------------------------------------
+6. SENSOR / HARDWARE SUBSTITUTIONS (from the supplied Wokwi mapping table)
+------------------------------------------------------------------------
+The column-to-sensor mapping used in generate_dataset.py follows exactly the
+"Our real Smart Tyre component → Wokwi substitute" table supplied by the
+user for the SIH prototype (BMP180 for pressure, DS18B20/NTC for
+temperature, MPU6050 for IMU + gyro, HX711 + load cell for load, HC-SR04 for
+deformation and for tread depth, ESP32 as the processing MCU, Wi-Fi/Serial
+for communication in place of BLE). No external source needed for this
+section — it reflects the user's own hardware/simulation plan.
+
+------------------------------------------------------------------------
+7. WHAT IS **NOT** GROUNDED IN A CITED SOURCE
+------------------------------------------------------------------------
+For transparency, the full list of [ENGINEERING ASSUMPTION] items above,
+gathered in one place:
+  - Steer-axle max load (3,400 kg) and the 90%/100% load "watch/overload"
+    percentage boundaries.
+  - New-tyre tread depth (18 mm) and average tread wear-out mileage
+    (150,000–220,000 km).
+  - Sidewall deformation thresholds (normal flex vs. structural bulge, mm).
+  - Vibration RMS thresholds (g) for normal/warning/critical.
+  - The exact penalty-function weights used to combine all six parameters
+    into a single 0–100 Tyre Health Score (the *direction* of every penalty
+    — e.g. "lower tread = worse", "higher deviation = worse" — is grounded
+    above; the specific point weightings are a designed scoring rubric, not
+    a published formula, since no public standard "Tyre Health Score"
+    formula exists).
+
+These are reasonable starting points for a hackathon prototype but should be
+clearly presented as assumptions to SIH judges, and ideally validated /
+recalibrated once real sensor data is collected from the physical rig.
