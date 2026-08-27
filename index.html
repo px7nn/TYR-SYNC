@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SmartTyre AI — Tyre Health Monitoring System</title>
+<title>TYRE-SYNC — Tyre Health Monitoring System</title>
 <style>
 /* ───────── RESET & BASE ───────── */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -139,14 +139,14 @@ div:has(> .tyre-label.hovered), div:has(> .tyre-label:hover) {
 
 <!-- LOADING -->
 <div class="loading-screen" id="loadingScreen">
-  <h2>SMART<span>TYRE</span> AI</h2>
+  <h2>TYRE-<span>SYNC</span></h2>
   <div class="loading-bar"><div class="loading-bar-inner" id="loadBar"></div></div>
   <div class="load-text" id="loadText">Initializing WASM engine…</div>
 </div>
 
 <div class="app">
   <header class="header">
-    <h1>🛞 Smart<span>Tyre</span> AI — Health Monitor</h1>
+    <h1>🛞 TYRE-<span>SYNC</span> — Health Monitor</h1>
     <div class="status">
       <div class="dot"></div>
       <span>WASM Inference Engine</span>
@@ -434,8 +434,9 @@ function initThree(){
       resolve();
     }, (progress)=>{
       if(progress.total){
-        const pct = 50 + (progress.loaded/progress.total)*35;
-        setLoad(pct, 'Loading 3D model… '+ Math.round(progress.loaded/progress.total*100)+'%');
+        const ratio = Math.min(1.0, progress.loaded / progress.total);
+        const pct = 50 + ratio * 35;
+        setLoad(pct, 'Loading 3D model… '+ Math.round(ratio * 100)+'%');
       }
     }, (err)=>{
       console.error('GLB load failed:', err);
