@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartTyre AI — Tyre Health Monitoring System</title>
+<style>
+/* ───────── RESET & BASE ───────── */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0e17;--panel:#0d1220;--card:#111827;--border:#1e2d4a;
+  --cyan:#00e5ff;--green:#00e676;--amber:#ffab00;--red:#ff1744;
+  --text:#e0e6ed;--dim:#6b7a90;--glow:0 0 12px rgba(0,229,255,.35);
+  --font:'Segoe UI',system-ui,sans-serif;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font)}
+
+/* ───────── LAYOUT ───────── */
+.app{display:grid;grid-template-rows:56px 1fr;grid-template-columns:340px 1fr 360px;height:100vh}
+.header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;background:var(--panel);border-bottom:1px solid var(--border);z-index:10}
+.header h1{font-size:18px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase}
+.header h1 span{color:var(--cyan)}
+.header .status{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim)}
+.header .status .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:blinker 2s infinite}
+@keyframes blinker{0%,100%{opacity:1}50%{opacity:.4}}
+
+.left-panel{grid-row:2;grid-column:1;background:var(--panel);border-right:1px solid var(--border);
+  overflow-y:auto;padding:16px}
+.viewport{grid-row:2;grid-column:2;position:relative;overflow:hidden;background:#060a12}
+.right-panel{grid-row:2;grid-column:3;background:var(--panel);border-left:1px solid var(--border);
+  overflow-y:auto;padding:16px}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+/* ───────── TYRE SELECTOR ───────── */
+.tyre-selector{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:16px}
+.tyre-btn{padding:10px 6px;border:1px solid var(--border);border-radius:8px;background:var(--card);
+  color:var(--dim);font-size:12px;font-weight:700;cursor:pointer;text-align:center;
+  transition:all .2s;letter-spacing:1px}
+.tyre-btn:hover{border-color:var(--cyan);color:var(--text)}
+.tyre-btn.active{border-color:var(--cyan);color:var(--cyan);background:rgba(0,229,255,.08);
+  box-shadow:inset 0 0 12px rgba(0,229,255,.1)}
+
+/* ───────── SLIDERS ───────── */
+.section-title{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);
+  margin:16px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.slider-group{margin-bottom:12px}
+.slider-label{display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px}
+.slider-label .name{color:var(--dim)}
+.slider-label .val{color:var(--cyan);font-weight:600;font-variant-numeric:tabular-nums}
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:2px;
+  background:var(--border);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--cyan);box-shadow:var(--glow);cursor:grab}
+input[type=range]:active::-webkit-slider-thumb{cursor:grabbing;transform:scale(1.2)}
+
+/* ───────── HEALTH DASHBOARD (RIGHT) ───────── */
+.health-card{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:20px;margin-bottom:16px;text-align:center}
+.health-card .title{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:12px}
+.score-ring{position:relative;width:160px;height:160px;margin:0 auto 12px}
+.score-ring canvas{width:100%;height:100%}
+.score-value{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.score-value .num{font-size:42px;font-weight:800;line-height:1}
+.score-value .label{font-size:11px;color:var(--dim);margin-top:4px}
+.risk-badge{display:inline-block;padding:6px 18px;border-radius:20px;font-size:12px;
+  font-weight:700;letter-spacing:1px;text-transform:uppercase}
+
+.readout-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+.readout{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center}
+.readout .ro-val{font-size:18px;font-weight:700;margin-bottom:2px}
+.readout .ro-lbl{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--dim)}
+
+.rec-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:12px}
+.rec-panel .title{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:10px}
+.rec-item{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);
+  font-size:12px;line-height:1.5}
+.rec-item:last-child{border-bottom:none}
+.rec-icon{flex-shrink:0;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:10px}
+
+/* ───────── VIEWPORT HUD ───────── */
+.vp-hud{position:absolute;top:12px;left:12px;z-index:5;pointer-events:none}
+.hud-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(13,18,32,.85);
+  border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:10px;
+  color:var(--dim);backdrop-filter:blur(8px)}
+.hud-badge .hud-dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
+
+/* ───────── 3D TYRE LABELS (CSS2DRenderer) ───────── */
+.tyre-label{
+  pointer-events:auto;cursor:pointer;
+  background:rgba(10,14,23,.88);
+  border:1.5px solid var(--border);
+  border-radius:10px;padding:6px 10px;
+  text-align:center;min-width:68px;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  transition:all .2s;
+  transform:translate(-50%,-100%) translateY(-12px);
+  font-family:var(--font);
+}
+.tyre-label:hover, .tyre-label.hovered{
+  border-color:var(--cyan);
+  transform:translate(-50%,-100%) translateY(-16px) scale(1.15);
+  box-shadow:0 0 24px rgba(0,229,255,0.4);
+}
+.tyre-label.active{border-color:var(--cyan);box-shadow:0 0 18px rgba(0,229,255,.3)}
+.tyre-label.dimmed {
+  opacity: 0.35;
+  filter: blur(0.5px);
+  transform: translate(-50%, -100%) translateY(-12px) scale(0.9);
+}
+/* Ensure the parent wrapper div gets sorted to the top when hovered */
+div:has(> .tyre-label.hovered), div:has(> .tyre-label:hover) {
+  z-index: 99999 !important;
+}
+.tyre-label .tl-name{font-size:9px;font-weight:800;letter-spacing:1.5px;color:var(--dim)}
+.tyre-label .tl-score{font-size:20px;font-weight:900;line-height:1.2}
+.tyre-label .tl-risk{font-size:8px;font-weight:700;letter-spacing:.5px;margin-top:1px}
+/* connecting line from label to tyre */
+.tyre-label::after{
+  content:'';position:absolute;bottom:-12px;left:50%;transform:translateX(-50%);
+  width:1.5px;height:12px;background:var(--cyan);opacity:.5}
+
+/* ───────── LOADING SCREEN ───────── */
+.loading-screen{position:fixed;inset:0;z-index:1000;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .6s}
+.loading-screen.hidden{opacity:0;pointer-events:none}
+.loading-screen h2{font-size:22px;letter-spacing:3px;margin-bottom:16px}
+.loading-screen h2 span{color:var(--cyan)}
+.loading-bar{width:260px;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+.loading-bar-inner{height:100%;width:0%;background:var(--cyan);transition:width .3s}
+.loading-screen .load-text{font-size:11px;color:var(--dim);margin-top:10px}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-screen" id="loadingScreen">
+  <h2>SMART<span>TYRE</span> AI</h2>
+  <div class="loading-bar"><div class="loading-bar-inner" id="loadBar"></div></div>
+  <div class="load-text" id="loadText">Initializing WASM engine…</div>
+</div>
+
+<div class="app">
+  <header class="header">
+    <h1>🛞 Smart<span>Tyre</span> AI — Health Monitor</h1>
+    <div class="status">
+      <div class="dot"></div>
+      <span>WASM Inference Engine</span>
+      <span style="margin-left:12px;color:var(--cyan)" id="inferTime">— ms</span>
+    </div>
+  </header>
+
+  <!-- LEFT PANEL -->
+  <aside class="left-panel" id="leftPanel">
+    <div class="tyre-selector" id="tyreSelector"></div>
+    <div class="section-title">🔧 Direct Sensor Parameters</div>
+    <div id="directSliders"></div>
+    <div class="section-title">📊 Derived Parameters</div>
+    <div id="derivedSliders"></div>
+    <div class="section-title">🌡️ Environment</div>
+    <div id="envSliders"></div>
+  </aside>
+
+  <!-- VIEWPORT -->
+  <main class="viewport" id="viewport">
+    <div class="vp-hud">
+      <div class="hud-badge"><div class="hud-dot"></div><span>LIVE 3D — MAN TGS TRUCK • Drag to orbit • Scroll to zoom</span></div>
+    </div>
+  </main>
+
+  <!-- RIGHT PANEL -->
+  <aside class="right-panel" id="rightPanel">
+    <div class="health-card">
+      <div class="title">Tyre Health Score</div>
+      <div class="score-ring">
+        <canvas id="ringCanvas" width="320" height="320"></canvas>
+        <div class="score-value">
+          <div class="num" id="scoreNum">—</div>
+          <div class="label">/ 100</div>
+        </div>
+      </div>
+      <div id="riskBadge" class="risk-badge">—</div>
+    </div>
+    <div class="readout-grid" id="readoutGrid"></div>
+    <div class="rec-panel">
+      <div class="title">⚡ AI Recommendations</div>
+      <div id="recList"></div>
+    </div>
+  </aside>
+</div>
+
+<!-- THREE.JS (ES Module) -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<!-- WASM -->
+<script src="static/inference.js"></script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* ══════════════════════════════════════════════════════════════════
+   CONFIG
+   ══════════════════════════════════════════════════════════════════ */
+const TYRE_POSITIONS = ['FL','FR','RLO','RLI','RRO','RRI'];
+const AXLE_MAP = {FL:'steer',FR:'steer',RLO:'drive',RLI:'drive',RRO:'drive',RRI:'drive'};
+
+const SCALER_MEANS = [150746.732,27.87392,59.70716,701.18209,71.27545,1814.14541,10.0655,5.38367,0.000945,0.000548,0.999724,-0.01079,-0.01256,1888.1605,0.0660128,314.6747,-1.51357,1.03674,73.56807,259.78145,70.08956,0.16625,0.16635,0.16808,0.16599,0.16531,0.16803,0.66740,0.33260];
+const SCALER_STDS  = [85863.1025,7.99740,21.26746,83.58498,16.89382,657.65388,5.04938,5.67402,0.13277,0.13341,0.13458,2.12341,2.11178,672.72166,0.11614,112.15185,10.81597,1.36305,17.33918,91.19666,31.52126,0.37230,0.37240,0.37394,0.37207,0.37146,0.37389,0.47115,0.47115];
+
+/*
+  GLB model coordinate system (from inspection):
+    X = left/right (-1.3 to +1.3)
+    Y = front/back (-3.1 front to +3.0 rear) — NOTE: model has positive Y towards rear
+    Z = height (-2.8 top to 0 ground)
+
+  Three.js convention: Y is up. We'll rotate the model so that:
+    model-X → world-X (left/right)
+    model-Y → world-Z (front/back)
+    model-Z → world-Y (up/down), inverted
+
+  Front axle center ~ model Y≈1.48, Rear axle center ~ model Y≈-2.11
+  Wheel width positions ~ model X≈±1.23 (single), ±0.95 and ±1.23 (dual)
+
+  After rotation (-90° around X): model(x,y,z) → world(x, -z, y)
+  Ground plane in model is Z≈0, which maps to world Y≈0.
+*/
+
+// Tyre 3D positions in the MODEL's coordinate system
+// These will be transformed by the model's rotation
+const TYRE_MODEL_POS = {
+  // Front axle (steer) — single tyres
+  FL:  { x: -1.23, y: 1.48, z: -0.50 },
+  FR:  { x:  1.23, y: 1.48, z: -0.50 },
+  // Rear axle (drive) — dual tyres
+  RLO: { x: -1.23, y: -2.11, z: -0.50 },
+  RLI: { x: -0.90, y: -2.11, z: -0.50 },
+  RRI: { x:  0.90, y: -2.11, z: -0.50 },
+  RRO: { x:  1.23, y: -2.11, z: -0.50 },
+};
+
+const DIRECT_SLIDERS = [
+  {key:'pressure_kpa',     label:'Pressure',     min:200,max:900, step:1,  def:690,  unit:'kPa', fi:3},
+  {key:'temperature_c',    label:'Temperature',   min:20, max:160, step:0.5,def:65,   unit:'°C',  fi:4},
+  {key:'load_kg',          label:'Load',          min:500,max:4000,step:10, def:1800, unit:'kg',  fi:5},
+  {key:'deformation_mm',   label:'Deformation',   min:2,  max:40,  step:0.1,def:9,    unit:'mm',  fi:6},
+  {key:'tread_depth_mm',   label:'Tread Depth',   min:0.3,max:12,  step:0.1,def:8,    unit:'mm',  fi:7},
+  {key:'vibration_rms_g',  label:'Vibration RMS', min:0,  max:1.5, step:0.01,def:0.05,unit:'g',   fi:14},
+  {key:'accel_x_g',        label:'Accel X',       min:-1, max:1,   step:0.01,def:0.0, unit:'g',   fi:8},
+  {key:'accel_y_g',        label:'Accel Y',       min:-1, max:1,   step:0.01,def:0.0, unit:'g',   fi:9},
+  {key:'accel_z_g',        label:'Accel Z',       min:0.5,max:1.5, step:0.01,def:1.0, unit:'g',   fi:10},
+];
+const DERIVED_SLIDERS = [
+  {key:'rotational_speed_rpm', label:'Rotation Speed',   min:50, max:700, step:1,  def:310,  unit:'rpm', fi:15},
+  {key:'vehicle_speed_kmph',   label:'Vehicle Speed',     min:0,  max:120, step:1,  def:60,   unit:'km/h',fi:2},
+  {key:'pressure_deviation_pct',label:'Pressure Deviation',min:-50,max:20,  step:0.5,def:-2,   unit:'%',   fi:16},
+  {key:'temp_rise_rate_c_per_min',label:'Temp Rise Rate', min:0,  max:10,  step:0.1,def:0.5,  unit:'°C/m',fi:17},
+  {key:'load_ratio_pct',       label:'Load Ratio',        min:30, max:150, step:1,  def:75,   unit:'%',   fi:18},
+  {key:'load_pressure_ratio',  label:'Load/Pressure',     min:50, max:500, step:1,  def:260,  unit:'',    fi:19},
+  {key:'tread_wear_pct',       label:'Tread Wear',        min:0,  max:100, step:1,  def:40,   unit:'%',   fi:20},
+];
+const ENV_SLIDERS = [
+  {key:'odometer_km',      label:'Odometer',      min:0,  max:400000,step:500,def:120000,unit:'km', fi:0},
+  {key:'ambient_temp_c',   label:'Ambient Temp',  min:-10,max:55,    step:0.5,def:30,    unit:'°C', fi:1},
+  {key:'gyro_x_dps',       label:'Gyro X',        min:-10,max:10,    step:0.1,def:0,     unit:'°/s',fi:11},
+  {key:'gyro_y_dps',       label:'Gyro Y',        min:-10,max:10,    step:0.1,def:0,     unit:'°/s',fi:12},
+  {key:'gyro_z_dps',       label:'Gyro Z',        min:0,  max:4000,  step:10, def:1900,  unit:'°/s',fi:13},
+];
+const ALL_SLIDERS = [...DIRECT_SLIDERS,...DERIVED_SLIDERS,...ENV_SLIDERS];
+
+/* ══════════════════════════════════════════════════════════════════
+   STATE
+   ══════════════════════════════════════════════════════════════════ */
+let activeTyre = 'FL';
+const tyreStates = {};
+TYRE_POSITIONS.forEach(tp => {
+  const s = {};
+  ALL_SLIDERS.forEach(sl => s[sl.key] = sl.def);
+  tyreStates[tp] = {params:s, score:null, risk:'—'};
+});
+
+let wasmModule = null, predictFn = null, mallocFn = null, freeFn = null;
+
+// Three.js globals
+let scene, camera, renderer, cssRenderer, controls, truckModel;
+const tyreLabelElements = {};
+const tyreLabel3D = {};
+const tyreGlowRings = {};
+
+/* ══════════════════════════════════════════════════════════════════
+   BOOT
+   ══════════════════════════════════════════════════════════════════ */
+async function boot(){
+  setLoad(10,'Loading WASM module…');
+  wasmModule = await createMLPModule({
+    locateFile: function(path) {
+      if (path.endsWith('.wasm') || path.endsWith('.data')) {
+        return 'static/' + path;
+      }
+      return path;
+    }
+  });
+  setLoad(30,'Initializing neural network…');
+  const ok = wasmModule._init_model();
+  if(!ok){ alert('Failed to load model!'); return; }
+  predictFn = wasmModule._predict;
+  mallocFn  = wasmModule._malloc;
+  freeFn    = wasmModule._free;
+
+  setLoad(50,'Loading 3D truck model…');
+  await initThree();
+  setLoad(90,'Building UI…');
+  buildUI();
+  setLoad(100,'Ready');
+  setTimeout(()=>document.getElementById('loadingScreen').classList.add('hidden'),500);
+  runAllInference();
+  animate();
+}
+
+function setLoad(pct,txt){
+  document.getElementById('loadBar').style.width = pct+'%';
+  document.getElementById('loadText').textContent = txt;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   THREE.JS — GLB + CSS2D Labels
+   ══════════════════════════════════════════════════════════════════ */
+function initThree(){
+  return new Promise((resolve, reject)=>{
+    const container = document.getElementById('viewport');
+    scene = new THREE.Scene();
+
+    // Ground grid
+    const grid = new THREE.GridHelper(30, 30, 0x1a2540, 0x0f1525);
+    scene.add(grid);
+
+    // Lighting
+    scene.add(new THREE.AmbientLight(0x8899bb, 1.2));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.5);
+    dir.position.set(5,8,5);
+    dir.castShadow = true;
+    scene.add(dir);
+    const fill = new THREE.DirectionalLight(0x4488cc, 0.5);
+    fill.position.set(-5,3,-5);
+    scene.add(fill);
+    // Cyan accent point light
+    const point = new THREE.PointLight(0x00e5ff, 0.4, 20);
+    point.position.set(0, 3, 0);
+    scene.add(point);
+
+    scene.fog = new THREE.FogExp2(0x060a12, 0.04);
+
+    // Camera
+    camera = new THREE.PerspectiveCamera(40, container.clientWidth/container.clientHeight, 0.1, 100);
+    camera.position.set(5, 3.5, 6);
+
+    // WebGL Renderer
+    renderer = new THREE.WebGLRenderer({antialias:true});
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+    renderer.setClearColor(0x060a12);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    // CSS2D Renderer (for HTML labels attached to 3D positions)
+    cssRenderer = new CSS2DRenderer();
+    cssRenderer.setSize(container.clientWidth, container.clientHeight);
+    cssRenderer.domElement.style.position = 'absolute';
+    cssRenderer.domElement.style.top = '0';
+    cssRenderer.domElement.style.left = '0';
+    cssRenderer.domElement.style.pointerEvents = 'none';
+    container.appendChild(cssRenderer.domElement);
+
+    // Controls
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, 0.8, 0);
+    controls.minDistance = 3;
+    controls.maxDistance = 15;
+
+    // Resize
+    window.addEventListener('resize',()=>{
+      const w = container.clientWidth, h = container.clientHeight;
+      camera.aspect = w/h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w,h);
+      cssRenderer.setSize(w,h);
+    });
+
+    // Load GLB
+    const loader = new GLTFLoader();
+    loader.load('static/assets/truck.glb',(gltf)=>{
+      truckModel = gltf.scene;
+      // GLB is already Y-up by default, no custom rotation needed
+      // Scale to reasonable size
+      const box = new THREE.Box3().setFromObject(truckModel);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const scale = 5.0 / maxDim;
+      truckModel.scale.setScalar(scale);
+
+      // Recompute bounding box after scale
+      const box2 = new THREE.Box3().setFromObject(truckModel);
+      const center2 = box2.getCenter(new THREE.Vector3());
+      // Place truck so ground is at y=0
+      truckModel.position.y -= box2.min.y;
+      truckModel.position.x -= center2.x;
+      truckModel.position.z -= center2.z;
+
+      scene.add(truckModel);
+
+      // Now place tyre labels & glow rings
+      TYRE_POSITIONS.forEach(tp => createTyreLabel(tp, scale));
+
+      controls.target.set(0, 0.8, 0);
+      controls.update();
+
+      resolve();
+    }, (progress)=>{
+      if(progress.total){
+        const pct = 50 + (progress.loaded/progress.total)*35;
+        setLoad(pct, 'Loading 3D model… '+ Math.round(progress.loaded/progress.total*100)+'%');
+      }
+    }, (err)=>{
+      console.error('GLB load failed:', err);
+      reject(err);
+    });
+  });
+}
+
+function createTyreLabel(tp, modelScale){
+  // Transform model coords to world coords
+  // Model rotation is -90° around X: model(x,y,z) → world(x, -z, y)
+  const mp = TYRE_MODEL_POS[tp];
+  const worldX = mp.x * modelScale;
+  const worldY = -mp.z * modelScale;
+  const worldZ = mp.y * modelScale;
+
+  // Apply truck model offset
+  const offsetY = truckModel.position.y;
+  const offsetX = truckModel.position.x;
+  const offsetZ = truckModel.position.z;
+
+  const finalX = worldX + offsetX;
+  const finalY = worldY + offsetY;
+  const finalZ = worldZ + offsetZ;
+
+  // CSS2D label
+  const el = document.createElement('div');
+  el.className = 'tyre-label' + (tp===activeTyre?' active':'');
+  el.innerHTML = `
+    <div class="tl-name">${tp}</div>
+    <div class="tl-score" id="tls-${tp}">—</div>
+    <div class="tl-risk" id="tlr-${tp}">—</div>
+  `;
+  el.style.pointerEvents = 'auto';
+  el.addEventListener('click', ()=> window._selectTyre(tp));
+
+  // Add hover effect listeners
+  el.addEventListener('mouseenter', () => {
+    el.classList.add('hovered');
+    TYRE_POSITIONS.forEach(otherTp => {
+      if (otherTp !== tp) {
+        const otherEl = tyreLabelElements[otherTp];
+        if (otherEl) otherEl.classList.add('dimmed');
+      }
+    });
+    // Pop out corresponding glow ring
+    const ring = tyreGlowRings[tp];
+    if (ring) {
+      ring.scale.set(1.25, 1.25, 1.25);
+    }
+  });
+
+  el.addEventListener('mouseleave', () => {
+    el.classList.remove('hovered');
+    TYRE_POSITIONS.forEach(otherTp => {
+      const otherEl = tyreLabelElements[otherTp];
+      if (otherEl) otherEl.classList.remove('dimmed');
+    });
+    // Restore glow ring scale
+    const ring = tyreGlowRings[tp];
+    if (ring) {
+      ring.scale.set(1, 1, 1);
+    }
+  });
+
+  tyreLabelElements[tp] = el;
+
+  const labelObj = new CSS2DObject(el);
+  labelObj.position.set(finalX, finalY + 0.6, finalZ); // offset upward
+  scene.add(labelObj);
+  tyreLabel3D[tp] = labelObj;
+
+  // Glow ring (Three.js torus at tyre position)
+  const ringGeo = new THREE.TorusGeometry(0.35*modelScale*2, 0.02, 8, 32);
+  const ringMat = new THREE.MeshBasicMaterial({color:0x00e676, transparent:true, opacity:0.6});
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.position.set(finalX, finalY, finalZ);
+  // Rotate ring to face outward (perpendicular to X axis)
+  ring.rotation.y = Math.PI/2;
+  scene.add(ring);
+  tyreGlowRings[tp] = ring;
+}
+
+function updateTyreVisuals(){
+  TYRE_POSITIONS.forEach(tp=>{
+    const st = tyreStates[tp];
+    if(st.score===null) return;
+    const col = getHealthColor(st.score);
+    const threeCol = new THREE.Color(col);
+
+    // Update label
+    const scoreEl = document.getElementById('tls-'+tp);
+    const riskEl = document.getElementById('tlr-'+tp);
+    if(scoreEl){ scoreEl.textContent = st.score.toFixed(0); scoreEl.style.color = col; }
+    if(riskEl){ riskEl.textContent = st.risk; riskEl.style.color = col; }
+
+    // Active state
+    tyreLabelElements[tp]?.classList.toggle('active', tp===activeTyre);
+
+    // Glow ring
+    const ring = tyreGlowRings[tp];
+    if(ring){
+      ring.material.color = threeCol;
+      ring.material.opacity = tp===activeTyre? 0.9 : 0.4;
+      if(tp===activeTyre){
+        const s = 1 + 0.05*Math.sin(Date.now()*0.004);
+        ring.scale.set(s,s,s);
+      } else {
+        ring.scale.set(1,1,1);
+      }
+    }
+  });
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  controls.update();
+  updateTyreVisuals();
+  renderer.render(scene, camera);
+  cssRenderer.render(scene, camera);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   WASM INFERENCE
+   ══════════════════════════════════════════════════════════════════ */
+function runInference(tyrePos){
+  const st = tyreStates[tyrePos];
+  const p = st.params;
+  const raw = new Float64Array(29);
+
+  ALL_SLIDERS.forEach(sl => { if(sl.fi >= 0) raw[sl.fi] = p[sl.key]; });
+
+  const tyreIdxMap = {FL:21,FR:22,RLI:23,RLO:24,RRI:25,RRO:26};
+  TYRE_POSITIONS.forEach(tp => raw[tyreIdxMap[tp]] = (tp===tyrePos)?1:0);
+
+  const ax = AXLE_MAP[tyrePos];
+  raw[27] = ax==='drive'?1:0;
+  raw[28] = ax==='steer'?1:0;
+
+  for(let i=0;i<29;i++) raw[i] = (raw[i]-SCALER_MEANS[i])/SCALER_STDS[i];
+
+  const ptr = mallocFn(29*8);
+  for(let i=0;i<29;i++) wasmModule.setValue(ptr+i*8, raw[i], 'double');
+
+  const t0 = performance.now();
+  const out = predictFn(ptr);
+  const dt = performance.now()-t0;
+  freeFn(ptr);
+
+  const score = Math.max(0, Math.min(100, out*100));
+  st.score = score;
+  st.risk = score>=75?'Healthy':score>=50?'Watch':score>=30?'Warning':'Critical';
+
+  if(tyrePos===activeTyre){
+    document.getElementById('inferTime').textContent = dt.toFixed(2)+' ms';
+    updateDashboard(score,st.risk,p);
+  }
+}
+
+function runAllInference(){
+  TYRE_POSITIONS.forEach(tp=>runInference(tp));
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   UI
+   ══════════════════════════════════════════════════════════════════ */
+function buildUI(){
+  const sel = document.getElementById('tyreSelector');
+  TYRE_POSITIONS.forEach(tp=>{
+    const btn = document.createElement('div');
+    btn.className = 'tyre-btn'+(tp===activeTyre?' active':'');
+    btn.textContent = tp;
+    btn.dataset.tyre = tp;
+    btn.onclick = ()=>window._selectTyre(tp);
+    sel.appendChild(btn);
+  });
+
+  buildSliders('directSliders', DIRECT_SLIDERS);
+  buildSliders('derivedSliders', DERIVED_SLIDERS);
+  buildSliders('envSliders', ENV_SLIDERS);
+
+  const rg = document.getElementById('readoutGrid');
+  [{id:'ro-press',lbl:'PRESSURE'},{id:'ro-temp',lbl:'TEMPERATURE'},{id:'ro-load',lbl:'LOAD'},{id:'ro-tread',lbl:'TREAD DEPTH'},{id:'ro-vib',lbl:'VIBRATION'},{id:'ro-speed',lbl:'SPEED'}].forEach(r=>{
+    const d = document.createElement('div');
+    d.className='readout';
+    d.innerHTML=`<div class="ro-val" id="${r.id}">—</div><div class="ro-lbl">${r.lbl}</div>`;
+    rg.appendChild(d);
+  });
+}
+
+function buildSliders(containerId, sliders){
+  const container = document.getElementById(containerId);
+  sliders.forEach(sl=>{
+    const g = document.createElement('div');
+    g.className='slider-group';
+    g.innerHTML = `
+      <div class="slider-label">
+        <span class="name">${sl.label}</span>
+        <span class="val" id="sv-${sl.key}">${sl.def} ${sl.unit}</span>
+      </div>
+      <input type="range" id="sl-${sl.key}" min="${sl.min}" max="${sl.max}" step="${sl.step}" value="${sl.def}">
+    `;
+    container.appendChild(g);
+    const inp = g.querySelector('input');
+    inp.addEventListener('input',()=>{
+      const v = parseFloat(inp.value);
+      tyreStates[activeTyre].params[sl.key] = v;
+      document.getElementById('sv-'+sl.key).textContent = v+' '+sl.unit;
+      runInference(activeTyre);
+    });
+  });
+}
+
+// Expose to global for onclick from CSS2D labels
+window._selectTyre = function(tp){
+  activeTyre = tp;
+  document.querySelectorAll('.tyre-btn').forEach(b=>b.classList.toggle('active',b.dataset.tyre===tp));
+
+  const p = tyreStates[tp].params;
+  ALL_SLIDERS.forEach(sl=>{
+    const inp = document.getElementById('sl-'+sl.key);
+    if(inp){ inp.value = p[sl.key]; document.getElementById('sv-'+sl.key).textContent = p[sl.key]+' '+sl.unit; }
+  });
+
+  runInference(tp);
+
+  // Smooth camera focus toward selected tyre
+  const labelObj = tyreLabel3D[tp];
+  if(labelObj){
+    const target = labelObj.position.clone();
+    target.y = 0.8;
+    controls.target.lerp(target, 0.3);
+  }
+};
+
+/* ══════════════════════════════════════════════════════════════════
+   DASHBOARD
+   ══════════════════════════════════════════════════════════════════ */
+function updateDashboard(score,risk,params){
+  document.getElementById('scoreNum').textContent = score.toFixed(1);
+  const col = getHealthColor(score);
+  document.getElementById('scoreNum').style.color = col;
+  drawRing(score, col);
+
+  const badge = document.getElementById('riskBadge');
+  badge.textContent = risk;
+  badge.style.background = col+'22';
+  badge.style.color = col;
+  badge.style.border = '1px solid '+col;
+
+  document.getElementById('ro-press').textContent = params.pressure_kpa.toFixed(0)+' kPa';
+  document.getElementById('ro-temp').textContent = params.temperature_c.toFixed(1)+'°C';
+  document.getElementById('ro-load').textContent = params.load_kg.toFixed(0)+' kg';
+  document.getElementById('ro-tread').textContent = params.tread_depth_mm.toFixed(1)+' mm';
+  document.getElementById('ro-vib').textContent = params.vibration_rms_g.toFixed(3)+' g';
+  document.getElementById('ro-speed').textContent = params.vehicle_speed_kmph.toFixed(0)+' km/h';
+
+  updateRecommendations(score, params);
+}
+
+function drawRing(score, color){
+  const canvas = document.getElementById('ringCanvas');
+  const ctx = canvas.getContext('2d');
+  const w=canvas.width,h=canvas.height,cx=w/2,cy=h/2,r=Math.min(w,h)/2-16;
+  ctx.clearRect(0,0,w,h);
+  ctx.beginPath(); ctx.arc(cx,cy,r,-Math.PI/2,Math.PI*1.5);
+  ctx.lineWidth=10; ctx.strokeStyle='#1e2d4a'; ctx.stroke();
+  const angle = (score/100)*Math.PI*2;
+  ctx.beginPath(); ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+angle);
+  ctx.lineWidth=10; ctx.lineCap='round'; ctx.strokeStyle=color;
+  ctx.shadowColor=color; ctx.shadowBlur=16; ctx.stroke(); ctx.shadowBlur=0;
+  for(let i=0;i<20;i++){
+    const a = -Math.PI/2 + (i/20)*Math.PI*2;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(a)*(r-18), cy+Math.sin(a)*(r-18));
+    ctx.lineTo(cx+Math.cos(a)*(r-12), cy+Math.sin(a)*(r-12));
+    ctx.lineWidth=1; ctx.strokeStyle='#1e2d4a44'; ctx.stroke();
+  }
+}
+
+function getHealthColor(score){
+  if(score>=75) return '#00e676';
+  if(score>=50) return '#ffab00';
+  if(score>=30) return '#ff9100';
+  return '#ff1744';
+}
+
+function updateRecommendations(score, p){
+  const recs = [];
+  if(p.pressure_kpa<600) recs.push({icon:'⬇️',color:'var(--red)',text:'Low tyre pressure detected. Inflate to recommended 690 kPa immediately.'});
+  if(p.pressure_kpa>800) recs.push({icon:'⬆️',color:'var(--amber)',text:'Over-inflated tyre. Reduce pressure to avoid uneven wear.'});
+  if(p.temperature_c>90) recs.push({icon:'🔥',color:'var(--red)',text:'Excessive tyre temperature! Reduce speed and allow cooling.'});
+  if(p.tread_depth_mm<3) recs.push({icon:'⚠️',color:'var(--red)',text:'Tread depth below safety threshold (3mm). Replace tyre soon.'});
+  if(p.tread_depth_mm<1.6) recs.push({icon:'🚨',color:'var(--red)',text:'CRITICAL: Tread depth below legal limit (1.6mm). Replace immediately!'});
+  if(p.vibration_rms_g>0.3) recs.push({icon:'📳',color:'var(--amber)',text:'Excessive vibration detected. Check wheel balance and alignment.'});
+  if(p.load_kg>2500) recs.push({icon:'⚖️',color:'var(--amber)',text:'Tyre is near overload capacity. Redistribute cargo if possible.'});
+  if(p.deformation_mm>20) recs.push({icon:'🔴',color:'var(--red)',text:'Abnormal sidewall deformation. Inspect for bulges or damage.'});
+  if(score>=75) recs.push({icon:'✅',color:'var(--green)',text:'Tyre health is good. Continue routine monitoring.'});
+  if(recs.length===0) recs.push({icon:'ℹ️',color:'var(--cyan)',text:'Parameters within normal range. Next inspection in 5,000 km.'});
+
+  document.getElementById('recList').innerHTML = recs.map(r=>`
+    <div class="rec-item">
+      <div class="rec-icon" style="background:${r.color}22;color:${r.color}">${r.icon}</div>
+      <div>${r.text}</div>
+    </div>
+  `).join('');
+}
+
+/* ══════════════════════════════════════════════════════════════════ */
+boot();
+</script>
+</body>
+</html>
