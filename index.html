@@ -209,6 +209,24 @@ div:has(> .tyre-label.hovered), div:has(> .tyre-label:hover) {
   </div>
 </div>
 
+<script>
+  // Catch top-level module/import failures before the ES module can call boot().
+  window.__tyreSyncBootComplete = false;
+  window.setTimeout(function(){
+    if(window.__tyreSyncBootComplete) return;
+    const screen = document.getElementById('loadingScreen');
+    const error = document.getElementById('loadError');
+    if(!screen || !error) return;
+    screen.classList.add('error');
+    document.getElementById('loadBar').style.width = '0%';
+    document.getElementById('loadText').textContent = 'Initialization stopped';
+    document.getElementById('loadErrorTitle').textContent = 'Frontend unavailable';
+    document.getElementById('loadErrorDetail').textContent = 'The dashboard engine could not be loaded. Check network access and reload the page.';
+    error.hidden = false;
+    document.getElementById('loadRetry').onclick = ()=>window.location.reload();
+  }, 20000);
+</script>
+
 <div class="app">
   <header class="header">
     <h1>🛞 TYRE-<span>SYNC</span> — Health Monitor</h1>
@@ -427,6 +445,7 @@ async function boot(){
     setTimeout(()=>document.getElementById('loadingScreen').classList.add('hidden'),500);
     runAllInference();
     animate();
+    window.__tyreSyncBootComplete = true;
   } catch(error) {
     console.error('TYRE-SYNC startup failed:', error);
     showBootError(bootStage);
@@ -452,6 +471,7 @@ function showBootError(stage){
     : 'The dashboard could not finish loading. Reload the page to try again.';
   error.hidden = false;
   document.getElementById('loadRetry').onclick = ()=>window.location.reload();
+  window.__tyreSyncBootComplete = true;
 }
 
 function showTruckError(){
