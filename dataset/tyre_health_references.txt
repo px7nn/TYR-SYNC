@@ -1,7 +1,7 @@
-AI-POWERED SMART TYRE HEALTH MONITORING — DATA SOURCES & ASSUMPTIONS
+ML-BASED SMART TYRE HEALTH MONITORING — DATA SOURCES & ASSUMPTIONS
 ======================================================================
 This file lists where every numeric threshold, nominal value and failure
-boundary in generate_dataset.py / tyre_health_dataset.csv came from. Rows
+boundary in generated tyre_health_dataset.csv came from. Rows
 marked [ENGINEERING ASSUMPTION] have no single public standard behind them
 (no public multi-sensor commercial-tyre dataset exists) — they were set
 using reasonable engineering judgement so they can be defended and re-tuned

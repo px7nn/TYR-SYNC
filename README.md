@@ -41,7 +41,6 @@ The output represents the normalized `tyre_health_score` (0 to 1).
 ### File Tree Guide
 *   `/dataset/`: Preprocessed CSV matrices and reference thresholds parameters details.
 *   `/model/`: Original neural network C training codes, MLP core library, and trained weight values.
-*   `/python/`: Feature scalers parsing utilities and dataset generators.
 *   `/static/`: WebAssembly compiled binaries (`.wasm`/`.js`/`.data`) and the 3D model assets.
 *   `/index.html`: Main visual dashboard application.
 </details>
