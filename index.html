@@ -122,11 +122,15 @@ input[type=range]:active::-webkit-slider-thumb{cursor:grabbing;transform:scale(1
 
 .rec-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:12px}
 .rec-panel .title{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:10px}
-.rec-item{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);
-  font-size:12px;line-height:1.5}
+.rec-item{display:grid;grid-template-columns:8px minmax(0,1fr);gap:10px;padding:10px 0;
+  border-bottom:1px solid var(--border);font-size:12px;line-height:1.5}
 .rec-item:last-child{border-bottom:none}
-.rec-icon{flex-shrink:0;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;
-  justify-content:center;font-size:10px}
+.rec-marker{width:8px;height:8px;margin-top:4px;background:var(--rec-color,var(--cyan))}
+.rec-meta{display:flex;align-items:center;gap:8px;margin-bottom:3px;font-family:var(--font-data);
+  font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+.rec-code{color:var(--dim)}
+.rec-state{color:var(--rec-color,var(--cyan))}
+.rec-text{color:var(--text)}
 
 /* ───────── VIEWPORT HUD ───────── */
 .vp-hud{position:absolute;top:12px;left:12px;z-index:5;pointer-events:none}
@@ -243,7 +247,7 @@ div:has(> .tyre-label.hovered), div:has(> .tyre-label:hover) {
     </div>
     <div class="readout-grid" id="readoutGrid"></div>
     <div class="rec-panel">
-      <div class="title">⚡ AI Recommendations</div>
+      <div class="title">Recommended Actions</div>
       <div id="recList"></div>
     </div>
     </aside>
@@ -850,21 +854,24 @@ function getHealthColor(score){
 
 function updateRecommendations(score, p){
   const recs = [];
-  if(p.pressure_kpa<600) recs.push({icon:'⬇️',color:'var(--red)',text:'Low tyre pressure detected. Inflate to recommended 690 kPa immediately.'});
-  if(p.pressure_kpa>800) recs.push({icon:'⬆️',color:'var(--amber)',text:'Over-inflated tyre. Reduce pressure to avoid uneven wear.'});
-  if(p.temperature_c>90) recs.push({icon:'🔥',color:'var(--red)',text:'Excessive tyre temperature! Reduce speed and allow cooling.'});
-  if(p.tread_depth_mm<3) recs.push({icon:'⚠️',color:'var(--red)',text:'Tread depth below safety threshold (3mm). Replace tyre soon.'});
-  if(p.tread_depth_mm<1.6) recs.push({icon:'🚨',color:'var(--red)',text:'CRITICAL: Tread depth below legal limit (1.6mm). Replace immediately!'});
-  if(p.vibration_rms_g>0.3) recs.push({icon:'📳',color:'var(--amber)',text:'Excessive vibration detected. Check wheel balance and alignment.'});
-  if(p.load_kg>2500) recs.push({icon:'⚖️',color:'var(--amber)',text:'Tyre is near overload capacity. Redistribute cargo if possible.'});
-  if(p.deformation_mm>20) recs.push({icon:'🔴',color:'var(--red)',text:'Abnormal sidewall deformation. Inspect for bulges or damage.'});
-  if(score>=75) recs.push({icon:'✅',color:'var(--green)',text:'Tyre health is good. Continue routine monitoring.'});
-  if(recs.length===0) recs.push({icon:'ℹ️',color:'var(--cyan)',text:'Parameters within normal range. Next inspection in 5,000 km.'});
+  if(p.pressure_kpa<600) recs.push({code:'PRESSURE',state:'LOW',color:'var(--red)',text:'Low tyre pressure detected. Inflate to recommended 690 kPa immediately.'});
+  if(p.pressure_kpa>800) recs.push({code:'PRESSURE',state:'HIGH',color:'var(--amber)',text:'Over-inflated tyre. Reduce pressure to avoid uneven wear.'});
+  if(p.temperature_c>90) recs.push({code:'TEMPERATURE',state:'HIGH',color:'var(--red)',text:'Excessive tyre temperature. Reduce speed and allow cooling.'});
+  if(p.tread_depth_mm<3) recs.push({code:'TREAD',state:'LOW',color:'var(--red)',text:'Tread depth below safety threshold (3mm). Replace tyre soon.'});
+  if(p.tread_depth_mm<1.6) recs.push({code:'TREAD',state:'LEGAL',color:'var(--red)',text:'Critical: tread depth below legal limit (1.6mm). Replace immediately.'});
+  if(p.vibration_rms_g>0.3) recs.push({code:'VIBRATION',state:'CHECK',color:'var(--amber)',text:'Excessive vibration detected. Check wheel balance and alignment.'});
+  if(p.load_kg>2500) recs.push({code:'LOAD',state:'HIGH',color:'var(--amber)',text:'Tyre is near overload capacity. Redistribute cargo if possible.'});
+  if(p.deformation_mm>20) recs.push({code:'SIDEWALL',state:'CHECK',color:'var(--red)',text:'Abnormal sidewall deformation. Inspect for bulges or damage.'});
+  if(score>=75) recs.push({code:'HEALTH',state:'GOOD',color:'var(--green)',text:'Tyre health is good. Continue routine monitoring.'});
+  if(recs.length===0) recs.push({code:'SYSTEM',state:'NORMAL',color:'var(--cyan)',text:'Parameters within normal range. Next inspection in 5,000 km.'});
 
   document.getElementById('recList').innerHTML = recs.map(r=>`
-    <div class="rec-item">
-      <div class="rec-icon" style="background:${r.color}22;color:${r.color}">${r.icon}</div>
-      <div>${r.text}</div>
+    <div class="rec-item" style="--rec-color:${r.color}">
+      <div class="rec-marker" aria-hidden="true"></div>
+      <div class="rec-content">
+        <div class="rec-meta"><span class="rec-code">${r.code}</span><span class="rec-state">${r.state}</span></div>
+        <div class="rec-text">${r.text}</div>
+      </div>
     </div>
   `).join('');
 }
