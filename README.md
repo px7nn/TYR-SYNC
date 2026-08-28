@@ -1,4 +1,4 @@
-## Tyre-Sync
+## Tyr-Sync
 
 ###### An ML-Based Predictive Tyre Health Monitoring System and Predictive Failure Detection System
 
