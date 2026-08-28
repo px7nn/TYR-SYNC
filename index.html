@@ -175,11 +175,24 @@ div:has(> .tyre-label.hovered), div:has(> .tyre-label:hover) {
 .loading-screen{position:fixed;inset:0;z-index:1000;background:var(--bg);
   display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .6s}
 .loading-screen.hidden{opacity:0;pointer-events:none}
+.loading-screen.error{align-items:center;text-align:center}
 .loading-screen h2{font-size:22px;letter-spacing:3px;margin-bottom:16px}
 .loading-screen h2 span{color:var(--cyan)}
 .loading-bar{width:260px;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
 .loading-bar-inner{height:100%;width:0%;background:var(--cyan);transition:width .3s}
 .loading-screen .load-text{font-size:11px;color:var(--dim);margin-top:10px}
+.loading-error{width:min(420px,calc(100% - 32px));margin-top:24px;padding:16px;border:1px solid var(--red);
+  background:var(--card);text-align:left}
+.loading-error[hidden],.viewport-error[hidden]{display:none}
+.loading-error .error-title{font-size:12px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--red)}
+.loading-error .error-detail{margin-top:6px;color:var(--dim);font-size:12px;line-height:1.5}
+.error-retry{margin-top:14px;padding:8px 12px;border:1px solid var(--border-strong);border-radius:0;
+  background:var(--text);color:var(--card);font-size:11px;font-weight:700;cursor:pointer}
+.error-retry:hover{background:var(--dim)}
+.viewport-error{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:24px;background:var(--bg);text-align:center}
+.viewport-error .error-title{font-size:13px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--red)}
+.viewport-error .error-detail{max-width:34ch;margin-top:8px;color:var(--dim);font-size:12px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -189,6 +202,11 @@ div:has(> .tyre-label.hovered), div:has(> .tyre-label:hover) {
   <h2>TYRE-<span>SYNC</span></h2>
   <div class="loading-bar"><div class="loading-bar-inner" id="loadBar"></div></div>
   <div class="load-text" id="loadText">Initializing WASM engine…</div>
+  <div class="loading-error" id="loadError" role="alert" hidden>
+    <div class="error-title" id="loadErrorTitle">Initialization failed</div>
+    <div class="error-detail" id="loadErrorDetail">Reload the dashboard to try again.</div>
+    <button type="button" class="error-retry" id="loadRetry">Reload dashboard</button>
+  </div>
 </div>
 
 <div class="app">
@@ -254,6 +272,11 @@ div:has(> .tyre-label.hovered), div:has(> .tyre-label:hover) {
   <main class="viewport" id="viewport">
     <div class="vp-hud">
       <div class="hud-badge"><div class="hud-dot"></div><span>LIVE 3D — MAN TGS TRUCK • Drag to orbit • Scroll to zoom</span></div>
+    </div>
+    <div class="viewport-error" id="viewportError" role="alert" hidden>
+      <div class="error-title">3D view unavailable</div>
+      <div class="error-detail">The diagnostic controls and model inference remain available. Reload to retry the truck view.</div>
+      <button type="button" class="error-retry" id="truckRetry">Reload truck view</button>
     </div>
   </main>
 </div>
@@ -369,35 +392,73 @@ const tyreStatusMarkers = {};
    BOOT
    ══════════════════════════════════════════════════════════════════ */
 async function boot(){
-  setLoad(10,'Loading WASM module…');
-  wasmModule = await createMLPModule({
-    locateFile: function(path) {
-      if (path.endsWith('.wasm') || path.endsWith('.data')) {
-        return 'static/' + path;
+  let bootStage = 'WASM module';
+  try {
+    setLoad(10,'Loading WASM module…');
+    wasmModule = await createMLPModule({
+      locateFile: function(path) {
+        if (path.endsWith('.wasm') || path.endsWith('.data')) {
+          return 'static/' + path;
+        }
+        return path;
       }
-      return path;
-    }
-  });
-  setLoad(30,'Initializing neural network…');
-  const ok = wasmModule._init_model();
-  if(!ok){ alert('Failed to load model!'); return; }
-  predictFn = wasmModule._predict;
-  mallocFn  = wasmModule._malloc;
-  freeFn    = wasmModule._free;
+    });
+    bootStage = 'neural network';
+    setLoad(30,'Initializing neural network…');
+    const ok = wasmModule._init_model();
+    if(!ok) throw new Error('Model initialization failed');
+    predictFn = wasmModule._predict;
+    mallocFn  = wasmModule._malloc;
+    freeFn    = wasmModule._free;
 
-  setLoad(50,'Loading 3D truck model…');
-  await initThree();
-  setLoad(90,'Building UI…');
-  buildUI();
-  setLoad(100,'Ready');
-  setTimeout(()=>document.getElementById('loadingScreen').classList.add('hidden'),500);
-  runAllInference();
-  animate();
+    bootStage = '3D truck view';
+    setLoad(50,'Loading 3D truck model…');
+    try {
+      await initThree();
+    } catch(error) {
+      console.error('3D view unavailable:', error);
+      showTruckError();
+    }
+
+    bootStage = 'dashboard';
+    setLoad(90,'Building UI…');
+    buildUI();
+    setLoad(100,'Ready');
+    setTimeout(()=>document.getElementById('loadingScreen').classList.add('hidden'),500);
+    runAllInference();
+    animate();
+  } catch(error) {
+    console.error('TYRE-SYNC startup failed:', error);
+    showBootError(bootStage);
+  }
 }
 
 function setLoad(pct,txt){
   document.getElementById('loadBar').style.width = pct+'%';
   document.getElementById('loadText').textContent = txt;
+}
+
+function showBootError(stage){
+  const screen = document.getElementById('loadingScreen');
+  const error = document.getElementById('loadError');
+  const title = document.getElementById('loadErrorTitle');
+  const detail = document.getElementById('loadErrorDetail');
+  screen.classList.add('error');
+  document.getElementById('loadBar').style.width = '0%';
+  document.getElementById('loadText').textContent = 'Initialization stopped';
+  title.textContent = stage==='neural network' ? 'Model unavailable' : 'Dashboard unavailable';
+  detail.textContent = stage==='neural network'
+    ? 'The WASM model could not be initialized. Reload the dashboard to try again.'
+    : 'The dashboard could not finish loading. Reload the page to try again.';
+  error.hidden = false;
+  document.getElementById('loadRetry').onclick = ()=>window.location.reload();
+}
+
+function showTruckError(){
+  const error = document.getElementById('viewportError');
+  if(!error) return;
+  error.hidden = false;
+  document.getElementById('truckRetry').onclick = ()=>window.location.reload();
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -625,10 +686,10 @@ function updateTyreVisuals(){
 
 function animate(){
   requestAnimationFrame(animate);
-  controls.update();
+  if(controls) controls.update();
   updateTyreVisuals();
-  renderer.render(scene, camera);
-  cssRenderer.render(scene, camera);
+  if(renderer && scene && camera) renderer.render(scene, camera);
+  if(cssRenderer && scene && camera) cssRenderer.render(scene, camera);
 }
 
 /* ══════════════════════════════════════════════════════════════════
