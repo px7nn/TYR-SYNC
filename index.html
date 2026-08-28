@@ -84,13 +84,15 @@ input[type=range]:active::-webkit-slider-thumb{cursor:grabbing;transform:scale(1
 
 /* ───────── HEALTH DASHBOARD (RIGHT) ───────── */
 .health-card{background:var(--card);border:1px solid var(--border);border-radius:12px;
-  padding:20px;margin-bottom:16px;text-align:center}
+  padding:20px;margin-bottom:16px;text-align:left}
 .health-card .title{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:12px}
-.score-ring{position:relative;width:160px;height:160px;margin:0 auto 12px}
-.score-ring canvas{width:100%;height:100%}
-.score-value{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.score-value .num{font-size:42px;font-weight:800;line-height:1}
-.score-value .label{font-size:11px;color:var(--dim);margin-top:4px}
+.score-value{display:flex;align-items:baseline;gap:6px;margin-bottom:12px}
+.score-value .num{font-family:var(--font-data);font-size:52px;font-weight:800;line-height:1;letter-spacing:-.03em}
+.score-value .label{font-family:var(--font-data);font-size:13px;color:var(--dim)}
+.score-scale{margin:4px 0 3px}
+.score-scale canvas{display:block;width:100%;height:56px}
+.score-scale-labels{display:flex;justify-content:space-between;color:var(--muted);font-size:9px;
+  letter-spacing:.4px;text-transform:uppercase}
 .risk-badge{display:inline-block;padding:6px 18px;border-radius:20px;font-size:12px;
   font-weight:700;letter-spacing:1px;text-transform:uppercase}
 
@@ -194,12 +196,15 @@ div:has(> .tyre-label.hovered), div:has(> .tyre-label:hover) {
     <aside class="right-panel" id="rightPanel">
     <div class="health-card">
       <div class="title">Tyre Health Score</div>
-      <div class="score-ring">
-        <canvas id="ringCanvas" width="320" height="320"></canvas>
-        <div class="score-value">
-          <div class="num" id="scoreNum">—</div>
-          <div class="label">/ 100</div>
-        </div>
+      <div class="score-value">
+        <div class="num" id="scoreNum">—</div>
+        <div class="label">/ 100</div>
+      </div>
+      <div class="score-scale">
+        <canvas id="scoreScaleCanvas" width="640" height="56" role="img" aria-label="Tyre health score scale"></canvas>
+      </div>
+      <div class="score-scale-labels" aria-hidden="true">
+        <span>0 Critical</span><span>30</span><span>50</span><span>75</span><span>100 Healthy</span>
       </div>
       <div id="riskBadge" class="risk-badge">—</div>
     </div>
@@ -705,7 +710,7 @@ function updateDashboard(score,risk,params){
   document.getElementById('scoreNum').textContent = score.toFixed(1);
   const col = getHealthColor(score);
   document.getElementById('scoreNum').style.color = col;
-  drawRing(score, col);
+  drawScoreScale(score, col);
 
   const badge = document.getElementById('riskBadge');
   badge.textContent = risk;
@@ -723,31 +728,31 @@ function updateDashboard(score,risk,params){
   updateRecommendations(score, params);
 }
 
-function drawRing(score, color){
-  const canvas = document.getElementById('ringCanvas');
+function drawScoreScale(score, color){
+  const canvas = document.getElementById('scoreScaleCanvas');
   const ctx = canvas.getContext('2d');
-  const w=canvas.width,h=canvas.height,cx=w/2,cy=h/2,r=Math.min(w,h)/2-16;
+  const w=canvas.width,h=canvas.height,left=8,right=w-8,y=25;
   ctx.clearRect(0,0,w,h);
-  ctx.beginPath(); ctx.arc(cx,cy,r,-Math.PI/2,Math.PI*1.5);
-  ctx.lineWidth=10; ctx.strokeStyle='#1e2d4a'; ctx.stroke();
-  const angle = (score/100)*Math.PI*2;
-  ctx.beginPath(); ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+angle);
-  ctx.lineWidth=10; ctx.lineCap='round'; ctx.strokeStyle=color;
-  ctx.shadowColor=color; ctx.shadowBlur=16; ctx.stroke(); ctx.shadowBlur=0;
-  for(let i=0;i<20;i++){
-    const a = -Math.PI/2 + (i/20)*Math.PI*2;
-    ctx.beginPath();
-    ctx.moveTo(cx+Math.cos(a)*(r-18), cy+Math.sin(a)*(r-18));
-    ctx.lineTo(cx+Math.cos(a)*(r-12), cy+Math.sin(a)*(r-12));
-    ctx.lineWidth=1; ctx.strokeStyle='#1e2d4a44'; ctx.stroke();
-  }
+  const scoreX = left + (Math.max(0, Math.min(100, score)) / 100) * (right-left);
+  ctx.lineCap='butt';
+  ctx.beginPath(); ctx.moveTo(left,y); ctx.lineTo(right,y);
+  ctx.lineWidth=8; ctx.strokeStyle='#c7c7c2'; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(left,y); ctx.lineTo(scoreX,y);
+  ctx.lineWidth=8; ctx.strokeStyle=color; ctx.stroke();
+  [0,30,50,75,100].forEach(mark=>{
+    const x=left+(mark/100)*(right-left);
+    ctx.beginPath(); ctx.moveTo(x,y-13); ctx.lineTo(x,y+13);
+    ctx.lineWidth=1; ctx.strokeStyle='#5d5d59'; ctx.stroke();
+  });
+  ctx.beginPath(); ctx.moveTo(scoreX,y-16); ctx.lineTo(scoreX,y+16);
+  ctx.lineWidth=3; ctx.strokeStyle='#151515'; ctx.stroke();
 }
 
 function getHealthColor(score){
-  if(score>=75) return '#00e676';
-  if(score>=50) return '#ffab00';
-  if(score>=30) return '#ff9100';
-  return '#ff1744';
+  if(score>=75) return '#137a3a';
+  if(score>=50) return '#a66200';
+  if(score>=30) return '#a84b16';
+  return '#b4232f';
 }
 
 function updateRecommendations(score, p){
