@@ -203,7 +203,11 @@ input[type=range]:active::-webkit-slider-thumb{cursor:grabbing;transform:scale(1
   border:1px solid var(--status-color,var(--border));
   border-radius:0;padding:6px 10px;
   text-align:center;min-width:68px;white-space:nowrap;
-  transition:color .2s,border-color .2s,background-color .2s;
+  transition:color var(--motion-standard) var(--ease-out),
+    border-color var(--motion-standard) var(--ease-out),
+    background-color var(--motion-standard) var(--ease-out),
+    transform var(--motion-standard) var(--ease-out),
+    opacity var(--motion-standard) var(--ease-out);
   transform:translate(-50%,-100%) translateY(-12px);
   font-family:var(--font);
 }
@@ -848,7 +852,8 @@ function createTyreLabel(tp, modelScale){
     // Emphasize the corresponding solid marker
     const marker = tyreStatusMarkers[tp];
     if (marker) {
-      marker.scale.set(1.15, 1.15, 1.15);
+      marker.userData.hovered = true;
+      marker.userData.targetScale = 1.15;
     }
   });
 
@@ -861,7 +866,8 @@ function createTyreLabel(tp, modelScale){
     // Restore solid marker scale
     const marker = tyreStatusMarkers[tp];
     if (marker) {
-      marker.scale.set(1, 1, 1);
+      marker.userData.hovered = false;
+      marker.userData.targetScale = marker.userData.active ? 1.05 : 1;
     }
   });
 
@@ -896,6 +902,9 @@ function createTyreLabel(tp, modelScale){
     color:themeColors.muted, transparent:true, opacity:0.85, side:THREE.DoubleSide
   });
   const marker = new THREE.Mesh(markerGeo, markerMat);
+  marker.userData.hovered = false;
+  marker.userData.active = false;
+  marker.userData.targetScale = 1;
   marker.position.set(finalX + Math.sign(mp.x)*0.05*modelScale, finalY, finalZ);
   // Face outward from the truck's side.
   marker.rotation.y = Math.PI/2;
@@ -938,14 +947,34 @@ function updateTyreVisuals(){
     // Solid status marker
     const marker = tyreStatusMarkers[tp];
     if(marker){
+      marker.userData.active = tp===activeTyre;
+      if(!marker.userData.hovered) marker.userData.targetScale = marker.userData.active ? 1.05 : 1;
       marker.material.color = threeCol;
       marker.material.opacity = tp===activeTyre? 1 : 0.6;
     }
   });
 }
 
-function animate(){
+function updateMarkerScales(deltaSeconds){
+  const reducedMotion = prefersReducedMotion();
+  Object.values(tyreStatusMarkers).forEach(marker=>{
+    const target = marker.userData.targetScale ?? 1;
+    if(reducedMotion){
+      marker.scale.setScalar(target);
+      return;
+    }
+    const current = marker.scale.x;
+    const eased = 1-Math.exp(-18*deltaSeconds);
+    marker.scale.setScalar(current+(target-current)*eased);
+  });
+}
+
+let lastAnimationTime = performance.now();
+function animate(timestamp=performance.now()){
   requestAnimationFrame(animate);
+  const deltaSeconds = Math.min(0.05,Math.max(0,(timestamp-lastAnimationTime)/1000));
+  lastAnimationTime = timestamp;
+  updateMarkerScales(deltaSeconds);
   if(controls) controls.update();
   updateTyreVisuals();
   if(renderer && scene && camera) renderer.render(scene, camera);
