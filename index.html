@@ -142,24 +142,21 @@ input[type=range]:active::-webkit-slider-thumb{cursor:grabbing;transform:scale(1
 /* ───────── 3D TYRE LABELS (CSS2DRenderer) ───────── */
 .tyre-label{
   pointer-events:auto;cursor:pointer;
-  background:rgba(10,14,23,.88);
-  border:1.5px solid var(--border);
-  border-radius:10px;padding:6px 10px;
+  background:var(--card);
+  border:1px solid var(--status-color,var(--border));
+  border-radius:0;padding:6px 10px;
   text-align:center;min-width:68px;
-  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  transition:all .2s;
+  transition:color .2s,border-color .2s,background-color .2s;
   transform:translate(-50%,-100%) translateY(-12px);
   font-family:var(--font);
 }
 .tyre-label:hover, .tyre-label.hovered{
-  border-color:var(--cyan);
-  transform:translate(-50%,-100%) translateY(-16px) scale(1.15);
-  box-shadow:0 0 24px rgba(0,229,255,0.4);
+  border-color:var(--border-strong);
+  transform:translate(-50%,-100%) translateY(-16px);
 }
-.tyre-label.active{border-color:var(--cyan);box-shadow:0 0 18px rgba(0,229,255,.3)}
+.tyre-label.active{border-color:var(--status-color,var(--border-strong));background:var(--text);color:var(--card)}
 .tyre-label.dimmed {
-  opacity: 0.35;
-  filter: blur(0.5px);
+  opacity: 0.45;
   transform: translate(-50%, -100%) translateY(-12px) scale(0.9);
 }
 /* Ensure the parent wrapper div gets sorted to the top when hovered */
@@ -172,7 +169,7 @@ div:has(> .tyre-label.hovered), div:has(> .tyre-label:hover) {
 /* connecting line from label to tyre */
 .tyre-label::after{
   content:'';position:absolute;bottom:-12px;left:50%;transform:translateX(-50%);
-  width:1.5px;height:12px;background:var(--cyan);opacity:.5}
+  width:1px;height:12px;background:var(--status-color,var(--border-strong));opacity:.75}
 
 /* ───────── LOADING SCREEN ───────── */
 .loading-screen{position:fixed;inset:0;z-index:1000;background:var(--bg);
@@ -366,7 +363,7 @@ let wasmModule = null, predictFn = null, mallocFn = null, freeFn = null;
 let scene, camera, renderer, cssRenderer, controls, truckModel;
 const tyreLabelElements = {};
 const tyreLabel3D = {};
-const tyreGlowRings = {};
+const tyreStatusMarkers = {};
 
 /* ══════════════════════════════════════════════════════════════════
    BOOT
@@ -488,7 +485,7 @@ function initThree(){
 
       scene.add(truckModel);
 
-      // Now place tyre labels & glow rings
+      // Now place tyre labels and solid tyre markers
       TYRE_POSITIONS.forEach(tp => createTyreLabel(tp, scale));
 
       controls.target.set(0, 0.8, 0);
@@ -545,10 +542,10 @@ function createTyreLabel(tp, modelScale){
         if (otherEl) otherEl.classList.add('dimmed');
       }
     });
-    // Pop out corresponding glow ring
-    const ring = tyreGlowRings[tp];
-    if (ring) {
-      ring.scale.set(1.25, 1.25, 1.25);
+    // Emphasize the corresponding solid marker
+    const marker = tyreStatusMarkers[tp];
+    if (marker) {
+      marker.scale.set(1.15, 1.15, 1.15);
     }
   });
 
@@ -558,10 +555,10 @@ function createTyreLabel(tp, modelScale){
       const otherEl = tyreLabelElements[otherTp];
       if (otherEl) otherEl.classList.remove('dimmed');
     });
-    // Restore glow ring scale
-    const ring = tyreGlowRings[tp];
-    if (ring) {
-      ring.scale.set(1, 1, 1);
+    // Restore solid marker scale
+    const marker = tyreStatusMarkers[tp];
+    if (marker) {
+      marker.scale.set(1, 1, 1);
     }
   });
 
@@ -572,15 +569,17 @@ function createTyreLabel(tp, modelScale){
   scene.add(labelObj);
   tyreLabel3D[tp] = labelObj;
 
-  // Glow ring (Three.js torus at tyre position)
-  const ringGeo = new THREE.TorusGeometry(0.35*modelScale*2, 0.02, 8, 32);
-  const ringMat = new THREE.MeshBasicMaterial({color:0x00e676, transparent:true, opacity:0.6});
-  const ring = new THREE.Mesh(ringGeo, ringMat);
-  ring.position.set(finalX, finalY, finalZ);
-  // Rotate ring to face outward (perpendicular to X axis)
-  ring.rotation.y = Math.PI/2;
-  scene.add(ring);
-  tyreGlowRings[tp] = ring;
+  // Solid square status marker at each tyre position
+  const markerGeo = new THREE.PlaneGeometry(0.45*modelScale*2, 0.45*modelScale*2);
+  const markerMat = new THREE.MeshBasicMaterial({
+    color:0x8a8a84, transparent:true, opacity:0.85, side:THREE.DoubleSide
+  });
+  const marker = new THREE.Mesh(markerGeo, markerMat);
+  marker.position.set(finalX + Math.sign(mp.x)*0.05*modelScale, finalY, finalZ);
+  // Face outward from the truck's side.
+  marker.rotation.y = Math.PI/2;
+  scene.add(marker);
+  tyreStatusMarkers[tp] = marker;
 }
 
 function updateTyreVisuals(){
@@ -606,6 +605,7 @@ function updateTyreVisuals(){
     }
 
     // Update label
+    tyreLabelElements[tp]?.style.setProperty('--status-color', col);
     const scoreEl = document.getElementById('tls-'+tp);
     const riskEl = document.getElementById('tlr-'+tp);
     if(scoreEl){ scoreEl.textContent = st.score.toFixed(0); scoreEl.style.color = col; }
@@ -614,17 +614,11 @@ function updateTyreVisuals(){
     // Active state
     tyreLabelElements[tp]?.classList.toggle('active', tp===activeTyre);
 
-    // Glow ring
-    const ring = tyreGlowRings[tp];
-    if(ring){
-      ring.material.color = threeCol;
-      ring.material.opacity = tp===activeTyre? 0.9 : 0.4;
-      if(tp===activeTyre){
-        const s = 1 + 0.05*Math.sin(Date.now()*0.004);
-        ring.scale.set(s,s,s);
-      } else {
-        ring.scale.set(1,1,1);
-      }
+    // Solid status marker
+    const marker = tyreStatusMarkers[tp];
+    if(marker){
+      marker.material.color = threeCol;
+      marker.material.opacity = tp===activeTyre? 1 : 0.6;
     }
   });
 }
