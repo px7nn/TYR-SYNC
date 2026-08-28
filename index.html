@@ -72,6 +72,12 @@
 html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.4}
 button,input{font:inherit}
 :focus-visible{outline:2px solid var(--border-strong);outline-offset:2px}
+html,body,.header,.data-panel,.left-panel,.right-panel,.viewport,
+.health-card,.readout,.rec-panel,.hud-badge{
+  transition:background-color var(--motion-standard) var(--ease-out),
+    color var(--motion-standard) var(--ease-out),
+    border-color var(--motion-standard) var(--ease-out);
+}
 
 /* ───────── LAYOUT ───────── */
 .app{display:grid;grid-template-rows:56px minmax(0,1fr);
@@ -86,8 +92,12 @@ button,input{font:inherit}
 .theme-toggle,.reset-button{display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:0 9px;
   border:1px solid var(--border);border-radius:0;background:transparent;color:var(--dim);
   font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;cursor:pointer;
-  transition:background-color .2s,color .2s,border-color .2s}
+  transition:background-color var(--motion-standard) var(--ease-out),
+    color var(--motion-standard) var(--ease-out),
+    border-color var(--motion-standard) var(--ease-out),
+    transform var(--motion-fast) var(--ease-out)}
 .theme-toggle:hover,.reset-button:hover{background:var(--card);border-color:var(--border-strong);color:var(--text)}
+.theme-toggle:active,.reset-button:active{transform:translateY(1px)}
 .theme-toggle[aria-pressed="true"]{background:var(--text);border-color:var(--text);color:var(--card)}
 .theme-toggle svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.5}
 @keyframes blinker{0%,100%{opacity:1}50%{opacity:.4}}
