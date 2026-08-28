@@ -102,7 +102,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;heigh
 input[type=range]:active::-webkit-slider-thumb{cursor:grabbing;transform:scale(1.2)}
 
 /* ───────── HEALTH DASHBOARD (RIGHT) ───────── */
-.health-card{background:var(--card);border:1px solid var(--border);border-radius:12px;
+.health-card{background:var(--card);border:1px solid var(--border);border-radius:0;
   padding:20px;margin-bottom:16px;text-align:left}
 .health-card .title{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:12px}
 .score-value{display:flex;align-items:baseline;gap:6px;margin-bottom:12px}
@@ -112,15 +112,15 @@ input[type=range]:active::-webkit-slider-thumb{cursor:grabbing;transform:scale(1
 .score-scale canvas{display:block;width:100%;height:56px}
 .score-scale-labels{display:flex;justify-content:space-between;color:var(--muted);font-size:9px;
   letter-spacing:.4px;text-transform:uppercase}
-.risk-badge{display:inline-block;padding:6px 18px;border-radius:20px;font-size:12px;
+.risk-badge{display:inline-block;padding:6px 18px;border-radius:0;font-size:12px;
   font-weight:700;letter-spacing:1px;text-transform:uppercase}
 
 .readout-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
-.readout{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center}
+.readout{background:var(--card);border:1px solid var(--border);border-radius:0;padding:10px;text-align:center}
 .readout .ro-val{font-size:18px;font-weight:700;margin-bottom:2px}
 .readout .ro-lbl{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--dim)}
 
-.rec-panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:12px}
+.rec-panel{background:var(--card);border:1px solid var(--border);border-radius:0;padding:16px;margin-top:12px}
 .rec-panel .title{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);margin-bottom:10px}
 .rec-item{display:grid;grid-template-columns:8px minmax(0,1fr);gap:10px;padding:10px 0;
   border-bottom:1px solid var(--border);font-size:12px;line-height:1.5}
