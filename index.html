@@ -82,6 +82,15 @@ button,input{font:inherit}
 /* ───────── SLIDERS ───────── */
 .section-title{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--dim);
   margin:16px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.parameter-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  border-bottom:1px solid var(--border);margin-bottom:12px}
+.parameter-tab{min-width:0;padding:8px 6px;border:0;border-bottom:2px solid transparent;
+  background:transparent;color:var(--dim);font-size:10px;font-weight:700;cursor:pointer;
+  letter-spacing:.7px;text-transform:uppercase;transition:color .2s,border-color .2s}
+.parameter-tab:hover{color:var(--text)}
+.parameter-tab.active{border-bottom-color:var(--border-strong);color:var(--text)}
+.parameter-panel{display:none}
+.parameter-panel.active{display:block}
 .slider-group{margin-bottom:12px}
 .slider-label{display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px}
 .slider-label .name{color:var(--dim)}
@@ -195,12 +204,26 @@ div:has(> .tyre-label.hovered), div:has(> .tyre-label:hover) {
   <div class="data-panel" id="dataPanel">
     <aside class="left-panel" id="leftPanel">
       <div class="tyre-selector" id="tyreSelector"></div>
-      <div class="section-title">🔧 Direct Sensor Parameters</div>
-      <div id="directSliders"></div>
-      <div class="section-title">📊 Derived Parameters</div>
-      <div id="derivedSliders"></div>
-      <div class="section-title">🌡️ Environment</div>
-      <div id="envSliders"></div>
+      <div class="section-title">Input Parameters</div>
+      <div class="parameter-tabs" role="tablist" aria-label="Parameter groups">
+        <button type="button" class="parameter-tab active" id="tab-direct" role="tab"
+          aria-controls="directPanel" aria-selected="true" data-tab-panel="directPanel">Direct Sensors</button>
+        <button type="button" class="parameter-tab" id="tab-derived" role="tab"
+          aria-controls="derivedPanel" aria-selected="false" tabindex="-1" data-tab-panel="derivedPanel">Derived Metrics</button>
+        <button type="button" class="parameter-tab" id="tab-environment" role="tab"
+          aria-controls="environmentPanel" aria-selected="false" tabindex="-1" data-tab-panel="environmentPanel">Environment</button>
+      </div>
+      <div class="parameter-panels">
+        <div class="parameter-panel active" id="directPanel" role="tabpanel" aria-labelledby="tab-direct">
+          <div id="directSliders"></div>
+        </div>
+        <div class="parameter-panel" id="derivedPanel" role="tabpanel" aria-labelledby="tab-derived">
+          <div id="derivedSliders"></div>
+        </div>
+        <div class="parameter-panel" id="environmentPanel" role="tabpanel" aria-labelledby="tab-environment">
+          <div id="envSliders"></div>
+        </div>
+      </div>
     </aside>
 
     <aside class="right-panel" id="rightPanel">
@@ -684,6 +707,26 @@ function buildUI(){
   buildSliders('derivedSliders', DERIVED_SLIDERS);
   buildSliders('envSliders', ENV_SLIDERS);
 
+  const parameterTabs = Array.from(document.querySelectorAll('.parameter-tab'));
+  parameterTabs.forEach((tab,index)=>{
+    tab.addEventListener('click',()=>setParameterTab(index));
+    tab.addEventListener('keydown',(event)=>{
+      if(event.key==='ArrowRight' || event.key==='ArrowDown'){
+        event.preventDefault();
+        setParameterTab(index+1,true);
+      } else if(event.key==='ArrowLeft' || event.key==='ArrowUp'){
+        event.preventDefault();
+        setParameterTab(index-1,true);
+      } else if(event.key==='Home'){
+        event.preventDefault();
+        setParameterTab(0,true);
+      } else if(event.key==='End'){
+        event.preventDefault();
+        setParameterTab(parameterTabs.length-1,true);
+      }
+    });
+  });
+
   const rg = document.getElementById('readoutGrid');
   [{id:'ro-press',lbl:'PRESSURE'},{id:'ro-temp',lbl:'TEMPERATURE'},{id:'ro-load',lbl:'LOAD'},{id:'ro-tread',lbl:'TREAD DEPTH'},{id:'ro-vib',lbl:'VIBRATION'},{id:'ro-speed',lbl:'SPEED'}].forEach(r=>{
     const d = document.createElement('div');
@@ -691,6 +734,21 @@ function buildUI(){
     d.innerHTML=`<div class="ro-val" id="${r.id}">—</div><div class="ro-lbl">${r.lbl}</div>`;
     rg.appendChild(d);
   });
+}
+
+function setParameterTab(index, moveFocus=false){
+  const tabs = Array.from(document.querySelectorAll('.parameter-tab'));
+  if(!tabs.length) return;
+  const activeIndex = (index + tabs.length) % tabs.length;
+  tabs.forEach((tab,i)=>{
+    const active = i===activeIndex;
+    tab.classList.toggle('active',active);
+    tab.setAttribute('aria-selected',String(active));
+    tab.tabIndex = active ? 0 : -1;
+    const panel = document.getElementById(tab.dataset.tabPanel);
+    if(panel) panel.classList.toggle('active',active);
+  });
+  if(moveFocus) tabs[activeIndex].focus();
 }
 
 function buildSliders(containerId, sliders){
