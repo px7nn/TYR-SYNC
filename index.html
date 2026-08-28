@@ -163,6 +163,8 @@ input[type=range]:active::-webkit-slider-thumb{cursor:grabbing;transform:scale(1
 .score-value{display:flex;align-items:baseline;gap:6px;margin-bottom:12px}
 .score-value .num{font-family:var(--font-data);font-size:52px;font-weight:800;line-height:1;letter-spacing:-.03em}
 .score-value .label{font-family:var(--font-data);font-size:13px;color:var(--dim)}
+@keyframes data-refresh{from{opacity:.5;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+.data-refresh{animation:data-refresh var(--motion-standard) var(--ease-out)}
 .score-scale{margin:4px 0 3px}
 .score-scale canvas{display:block;width:100%;height:56px}
 .score-scale-labels{display:flex;justify-content:space-between;color:var(--muted);font-size:9px;
@@ -1111,7 +1113,19 @@ window._selectTyre = function(tp){
 /* ══════════════════════════════════════════════════════════════════
    DASHBOARD
    ══════════════════════════════════════════════════════════════════ */
+let displayedScore = null;
+let scoreScaleValue = null;
+let scoreScaleFrame = null;
+
+function pulseDataElement(element){
+  if(!element || prefersReducedMotion()) return;
+  element.classList.remove('data-refresh');
+  void element.offsetWidth;
+  element.classList.add('data-refresh');
+}
+
 function updateDashboard(score,risk,params){
+  const scoreChanged = displayedScore!==null && Math.abs(displayedScore-score)>0.05;
   document.getElementById('scoreNum').textContent = score.toFixed(1);
   const col = getHealthColor(score);
   document.getElementById('scoreNum').style.color = col;
@@ -1131,9 +1145,38 @@ function updateDashboard(score,risk,params){
   document.getElementById('ro-speed').textContent = params.vehicle_speed_kmph.toFixed(0)+' km/h';
 
   updateRecommendations(score, params);
+  if(scoreChanged){
+    pulseDataElement(document.getElementById('scoreNum'));
+    pulseDataElement(document.getElementById('riskBadge'));
+  }
+  displayedScore = score;
 }
 
 function drawScoreScale(score, color){
+  const from = scoreScaleValue;
+  if(scoreScaleFrame){
+    cancelAnimationFrame(scoreScaleFrame);
+    scoreScaleFrame = null;
+  }
+  if(from===null || Math.abs(score-from)<0.01 || prefersReducedMotion()){
+    scoreScaleValue = score;
+    drawScoreScaleFrame(score,color);
+    return;
+  }
+  const startedAt = performance.now();
+  const duration = 240;
+  const animateFrame = now=>{
+    const progress = Math.min(1,(now-startedAt)/duration);
+    const eased = 1-Math.pow(1-progress,3);
+    scoreScaleValue = from+(score-from)*eased;
+    drawScoreScaleFrame(scoreScaleValue,color);
+    if(progress<1) scoreScaleFrame = requestAnimationFrame(animateFrame);
+    else { scoreScaleFrame = null; scoreScaleValue = score; }
+  };
+  scoreScaleFrame = requestAnimationFrame(animateFrame);
+}
+
+function drawScoreScaleFrame(score, color){
   const canvas = document.getElementById('scoreScaleCanvas');
   const ctx = canvas.getContext('2d');
   const w=canvas.width,h=canvas.height,left=8,right=w-8,y=25;
